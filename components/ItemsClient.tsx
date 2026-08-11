@@ -5,7 +5,7 @@ import type { Item, ItemInput } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { NewItemDialog } from "@/components/NewItemDialog";
+import { ItemDialog } from "@/components/ItemDialog";
 
 export function ItemsClient() {
   const { status, syncVersion } = useAuth();
@@ -33,6 +33,14 @@ export function ItemsClient() {
     return item;
   }
 
+  async function handleUpdateItem(itemId: string, input: ItemInput) {
+    const updated = await store.updateItem(itemId, input);
+    setItems((prev) =>
+      prev.map((item) => (item.id === itemId ? updated : item)).sort((a, b) => a.name.localeCompare(b.name))
+    );
+    return updated;
+  }
+
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
@@ -41,7 +49,7 @@ export function ItemsClient() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Your items</h1>
-        <NewItemDialog onCreate={handleCreateItem} />
+        <ItemDialog mode="create" onSave={handleCreateItem} />
       </div>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -54,10 +62,17 @@ export function ItemsClient() {
               <div key={item.id}>
                 {i > 0 && <Separator className="my-1" />}
                 <div className="flex items-center justify-between px-2 py-2">
-                  <span className="font-medium">{item.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    P{item.protein} · C{item.carbs} · F{item.fat} · {item.calories} kcal
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{item.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      P{item.protein} · C{item.carbs} · F{item.fat} · {item.calories} kcal
+                    </span>
+                  </div>
+                  <ItemDialog
+                    mode="edit"
+                    item={item}
+                    onSave={(input) => handleUpdateItem(item.id, input)}
+                  />
                 </div>
               </div>
             ))}

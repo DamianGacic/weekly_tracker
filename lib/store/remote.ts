@@ -27,11 +27,22 @@ export const remoteStore: DataStore = {
     if (error || !data) throw error ?? new Error("Could not create item.");
     return data;
   },
-  async logItem(itemId: string) {
+  async updateItem(itemId: string, input: ItemInput) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("items")
+      .update(input)
+      .eq("id", itemId)
+      .select(ITEM_COLUMNS)
+      .single();
+    if (error || !data) throw error ?? new Error("Could not update item.");
+    return data;
+  },
+  async logItem(itemId: string, consumedAt?: string) {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("logs")
-      .insert({ item_id: itemId })
+      .insert(consumedAt ? { item_id: itemId, consumed_at: consumedAt } : { item_id: itemId })
       .select(LOG_COLUMNS)
       .single();
     if (error || !data) throw error ?? new Error("Could not log item.");

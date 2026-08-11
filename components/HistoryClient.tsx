@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Item, LogEntry } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
-import { getWeekStart, avgDaily, formatWeekRange } from "@/lib/week";
-import { round1 } from "@/lib/macros";
+import { getWeekStart, avgDaily, formatWeekRange, formatWeekLabel } from "@/lib/week";
+import { countLogsByItem, sumMacros, round1 } from "@/lib/macros";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { WeekLogEditor } from "@/components/WeekLogEditor";
 
-type WeekTotals = { weekStart: Date; protein: number; carbs: number; fat: number; calories: number };
+type WeekGroup = { weekStart: Date; weekLogs: LogEntry[] };
 
 export function HistoryClient() {
   const { status, syncVersion } = useAuth();
@@ -16,6 +18,7 @@ export function HistoryClient() {
   const [items, setItems] = useState<Item[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedKey, setExpandedKey] = useState<number | null>(null);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -32,26 +35,21 @@ export function HistoryClient() {
   }, [store, status, syncVersion]);
 
   const weekStart = useMemo(() => getWeekStart(new Date()), []);
-  const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
-  const orderedWeeks = useMemo(() => {
-    const weeks = new Map<number, WeekTotals>();
+  const weekGroups = useMemo(() => {
+    const groups = new Map<number, LogEntry[]>();
     for (const log of logs) {
       const logDate = new Date(log.consumed_at);
       if (logDate >= weekStart) continue;
-      const item = itemsById.get(log.item_id);
-      if (!item) continue;
-      const ws = getWeekStart(logDate);
-      const key = ws.getTime();
-      const existing = weeks.get(key) ?? { weekStart: ws, protein: 0, carbs: 0, fat: 0, calories: 0 };
-      existing.protein += item.protein;
-      existing.carbs += item.carbs;
-      existing.fat += item.fat;
-      existing.calories += item.calories;
-      weeks.set(key, existing);
+      const key = getWeekStart(logDate).getTime();
+      const group = groups.get(key) ?? [];
+      group.push(log);
+      groups.set(key, group);
     }
-    return Array.from(weeks.values()).sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime());
-  }, [logs, itemsById, weekStart]);
+    return Array.from(groups.entries())
+      .map(([key, weekLogs]): WeekGroup => ({ weekStart: new Date(key), weekLogs }))
+      .sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime());
+  }, [logs, weekStart]);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -60,22 +58,57 @@ export function HistoryClient() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold">Past weeks</h1>
-      {orderedWeeks.length === 0 ? (
+      {weekGroups.length === 0 ? (
         <p className="text-sm text-muted-foreground">No completed weeks yet.</p>
       ) : (
-        orderedWeeks.map((week) => {
+        weekGroups.map(({ weekStart: ws, weekLogs }) => {
+          const key = ws.getTime();
+          const expanded = expandedKey === key;
+          const counts = countLogsByItem(weekLogs);
+          const totals = sumMacros(items, counts);
           const now = new Date();
           return (
-            <Card key={week.weekStart.getTime()}>
+            <Card key={key}>
               <CardHeader>
-                <CardTitle className="text-base">{formatWeekRange(week.weekStart)}</CardTitle>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base">{formatWeekRange(ws)}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{formatWeekLabel(ws)}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExpandedKey(expanded ? null : key)}
+                  >
+                    {expanded ? "Done" : "Edit"}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <WeekStat label="Protein" total={week.protein} weekStart={week.weekStart} now={now} unit="g" />
-                <WeekStat label="Carbs" total={week.carbs} weekStart={week.weekStart} now={now} unit="g" />
-                <WeekStat label="Fat" total={week.fat} weekStart={week.weekStart} now={now} unit="g" />
-                <WeekStat label="Calories" total={week.calories} weekStart={week.weekStart} now={now} unit=" kcal" />
+                <WeekStat label="Protein" total={totals.protein} weekStart={ws} now={now} unit="g" />
+                <WeekStat label="Carbs" total={totals.carbs} weekStart={ws} now={now} unit="g" />
+                <WeekStat label="Fat" total={totals.fat} weekStart={ws} now={now} unit="g" />
+                <WeekStat
+                  label="Calories"
+                  total={totals.calories}
+                  weekStart={ws}
+                  now={now}
+                  unit=" kcal"
+                />
               </CardContent>
+              {expanded && (
+                <CardContent>
+                  <WeekLogEditor
+                    items={items}
+                    weekLogs={weekLogs}
+                    weekStart={ws}
+                    isCurrentWeek={false}
+                    store={store}
+                    onLogsChange={setLogs}
+                    emptyLabel="Nothing logged that week."
+                  />
+                </CardContent>
+              )}
             </Card>
           );
         })

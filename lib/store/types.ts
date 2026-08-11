@@ -26,6 +26,8 @@ export interface DataStore {
   listItems(): Promise<Item[]>;
   listLogs(): Promise<LogEntry[]>;
   createItem(input: ItemInput): Promise<Item>;
-  logItem(itemId: string): Promise<LogEntry>;
+  updateItem(itemId: string, input: ItemInput): Promise<Item>;
+  /** `consumedAt` defaults to now; pass it explicitly to log into a past week. */
+  logItem(itemId: string, consumedAt?: string): Promise<LogEntry>;
   deleteLog(logId: string): Promise<void>;
 }

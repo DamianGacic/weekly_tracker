@@ -51,3 +51,23 @@ export function formatWeekRange(weekStart: Date): string {
   const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return `${fmt(weekStart)} – ${fmt(weekEnd)}`;
 }
+
+/**
+ * ISO 8601 week number: weeks start Monday, week 1 is the week containing
+ * the year's first Thursday — so the ISO week-year can differ from the
+ * calendar year for a few days around New Year's.
+ */
+export function getISOWeek(date: Date): { year: number; week: number } {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7; // Monday=1 ... Sunday=7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // move to this week's Thursday
+  const isoYear = d.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: isoYear, week };
+}
+
+export function formatWeekLabel(weekStart: Date): string {
+  const { year, week } = getISOWeek(weekStart);
+  return `${year}, week ${week}`;
+}

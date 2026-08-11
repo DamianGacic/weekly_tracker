@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Pencil } from "lucide-react";
 import type { Item, ItemInput } from "@/lib/store/types";
 import { caloriesFor, round1 } from "@/lib/macros";
 import { parseDecimal } from "@/lib/number";
@@ -17,13 +18,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function NewItemDialog({ onCreate }: { onCreate: (input: ItemInput) => Promise<Item> }) {
+type ItemDialogProps =
+  | { mode: "create"; item?: undefined; onSave: (input: ItemInput) => Promise<Item> }
+  | { mode: "edit"; item: Item; onSave: (input: ItemInput) => Promise<Item> };
+
+export function ItemDialog({ mode, item, onSave }: ItemDialogProps) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fat, setFat] = useState("");
-  const [calories, setCalories] = useState("");
+  const [name, setName] = useState(item?.name ?? "");
+  const [protein, setProtein] = useState(item ? String(item.protein) : "");
+  const [carbs, setCarbs] = useState(item ? String(item.carbs) : "");
+  const [fat, setFat] = useState(item ? String(item.fat) : "");
+  const [calories, setCalories] = useState(item ? String(item.calories) : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,11 +39,11 @@ export function NewItemDialog({ onCreate }: { onCreate: (input: ItemInput) => Pr
   );
 
   function reset() {
-    setName("");
-    setProtein("");
-    setCarbs("");
-    setFat("");
-    setCalories("");
+    setName(item?.name ?? "");
+    setProtein(item ? String(item.protein) : "");
+    setCarbs(item ? String(item.carbs) : "");
+    setFat(item ? String(item.fat) : "");
+    setCalories(item ? String(item.calories) : "");
     setError(null);
   }
 
@@ -48,7 +53,7 @@ export function NewItemDialog({ onCreate }: { onCreate: (input: ItemInput) => Pr
     setError(null);
 
     try {
-      await onCreate({
+      await onSave({
         name: name.trim(),
         protein: parseDecimal(protein),
         carbs: parseDecimal(carbs),
@@ -58,7 +63,7 @@ export function NewItemDialog({ onCreate }: { onCreate: (input: ItemInput) => Pr
       reset();
       setOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create item.");
+      setError(err instanceof Error ? err.message : "Could not save item.");
     } finally {
       setSaving(false);
     }
@@ -72,11 +77,26 @@ export function NewItemDialog({ onCreate }: { onCreate: (input: ItemInput) => Pr
         if (!next) reset();
       }}
     >
-      <DialogTrigger render={<Button variant="outline" />}>New item</DialogTrigger>
+      {mode === "create" ? (
+        <DialogTrigger render={<Button variant="outline" />}>New item</DialogTrigger>
+      ) : (
+        <DialogTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Edit ${item.name}`}
+            />
+          }
+        >
+          <Pencil className="size-3.5" />
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>New item</DialogTitle>
+            <DialogTitle>{mode === "create" ? "New item" : "Edit item"}</DialogTitle>
             <DialogDescription>
               Macros in grams per serving. Leave calories blank to use the value calculated from
               protein/carbs/fat.
@@ -143,7 +163,7 @@ export function NewItemDialog({ onCreate }: { onCreate: (input: ItemInput) => Pr
           </div>
           <DialogFooter>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Add item"}
+              {saving ? "Saving…" : mode === "create" ? "Add item" : "Save changes"}
             </Button>
           </DialogFooter>
         </form>

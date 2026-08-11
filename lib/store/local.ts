@@ -54,4 +54,10 @@ export const localStore: DataStore = {
     write(LOGS_KEY, [...read<LogEntry>(LOGS_KEY), log]);
     return log;
   },
+  async deleteLog(logId: string) {
+    write(
+      LOGS_KEY,
+      read<LogEntry>(LOGS_KEY).filter((log) => log.id !== logId)
+    );
+  },
 };

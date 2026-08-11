@@ -27,4 +27,5 @@ export interface DataStore {
   listLogs(): Promise<LogEntry[]>;
   createItem(input: ItemInput): Promise<Item>;
   logItem(itemId: string): Promise<LogEntry>;
+  deleteLog(logId: string): Promise<void>;
 }

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { NewItemDialog } from "@/components/NewItemDialog";
+import { Minus } from "lucide-react";
 
 export function DashboardClient() {
   const { status, syncVersion } = useAuth();
@@ -85,6 +86,23 @@ export function DashboardClient() {
     setPendingId(null);
   }
 
+  async function unlogItem(itemId: string) {
+    const mostRecent = thisWeekLogs
+      .filter((log) => log.item_id === itemId)
+      .sort((a, b) => new Date(b.consumed_at).getTime() - new Date(a.consumed_at).getTime())[0];
+    if (!mostRecent) return;
+
+    setPendingId(itemId);
+    setLogs((prev) => prev.filter((l) => l.id !== mostRecent.id));
+
+    try {
+      await store.deleteLog(mostRecent.id);
+    } catch {
+      setLogs((prev) => [...prev, mostRecent]);
+    }
+    setPendingId(null);
+  }
+
   async function handleCreateItem(input: ItemInput) {
     const item = await store.createItem(input);
     setItems((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)));
@@ -132,7 +150,8 @@ export function DashboardClient() {
                 item={item}
                 count={counts.get(item.id) ?? 0}
                 pending={pendingId === item.id}
-                onClick={() => logItem(item.id)}
+                onAdd={() => logItem(item.id)}
+                onSubtract={() => unlogItem(item.id)}
               />
             ))}
           </CardContent>
@@ -155,7 +174,8 @@ export function DashboardClient() {
                     item={item}
                     count={counts.get(item.id) ?? 0}
                     pending={pendingId === item.id}
-                    onClick={() => logItem(item.id)}
+                    onAdd={() => logItem(item.id)}
+                    onSubtract={() => unlogItem(item.id)}
                   />
                 </div>
               ))}
@@ -232,26 +252,42 @@ function ItemRow({
   item,
   count,
   pending,
-  onClick,
+  onAdd,
+  onSubtract,
 }: {
   item: Item;
   count: number;
   pending: boolean;
-  onClick: () => void;
+  onAdd: () => void;
+  onSubtract: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={pending}
-      className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left hover:bg-accent disabled:opacity-60"
-    >
-      <div className="flex flex-col">
+    <div className="flex w-full items-center justify-between rounded-md px-2 py-2 hover:bg-accent">
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={pending}
+        className="flex flex-1 flex-col items-start text-left disabled:opacity-60"
+      >
         <span className="font-medium">{item.name}</span>
         <span className="text-xs text-muted-foreground">
           P{item.protein} · C{item.carbs} · F{item.fat} · {item.calories} kcal
         </span>
-      </div>
-      {count > 0 && <Badge variant="secondary">×{count}</Badge>}
-    </button>
+      </button>
+      {count > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onSubtract}
+            disabled={pending}
+            aria-label={`Remove one ${item.name}`}
+            className="flex size-5 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-60"
+          >
+            <Minus className="size-3" />
+          </button>
+          <Badge variant="secondary">×{count}</Badge>
+        </div>
+      )}
+    </div>
   );
 }

@@ -37,4 +37,9 @@ export const remoteStore: DataStore = {
     if (error || !data) throw error ?? new Error("Could not log item.");
     return data;
   },
+  async deleteLog(logId: string) {
+    const supabase = createClient();
+    const { error } = await supabase.from("logs").delete().eq("id", logId);
+    if (error) throw error;
+  },
 };

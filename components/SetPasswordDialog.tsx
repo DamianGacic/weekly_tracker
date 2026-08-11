@@ -12,11 +12,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function SetPasswordDialog() {
-  const [open, setOpen] = useState(false);
+export function SetPasswordDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
@@ -54,11 +58,10 @@ export function SetPasswordDialog() {
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        setOpen(next);
+        onOpenChange(next);
         if (!next) reset();
       }}
     >
-      <DialogTrigger render={<Button variant="ghost" size="sm" />}>Set password</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Set a password</DialogTitle>

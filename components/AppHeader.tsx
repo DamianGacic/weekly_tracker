@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/store/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { SetPasswordDialog } from "@/components/SetPasswordDialog";
+import { AccountMenu } from "@/components/AccountMenu";
 
 const NAV_LINKS = [
   { key: "week", href: "/", label: "This week" },
@@ -14,11 +13,6 @@ const NAV_LINKS = [
 
 export function AppHeader({ active }: { active: "week" | "items" | "history" }) {
   const { status, email } = useAuth();
-
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-  }
 
   return (
     <header className="flex items-center justify-between border-b px-4 py-3 sm:px-6">
@@ -40,14 +34,8 @@ export function AppHeader({ active }: { active: "week" | "items" | "history" }) 
           ))}
         </nav>
       </div>
-      {status === "authed" ? (
-        <div className="flex items-center gap-3">
-          {email && <span className="hidden text-xs text-muted-foreground sm:inline">{email}</span>}
-          <SetPasswordDialog />
-          <Button variant="ghost" size="sm" onClick={handleSignOut}>
-            Sign out
-          </Button>
-        </div>
+      {status === "authed" && email ? (
+        <AccountMenu email={email} />
       ) : status === "anon" ? (
         <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/login" />}>
           Sign in to save online

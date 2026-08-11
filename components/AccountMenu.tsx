@@ -24,7 +24,6 @@ export function AccountMenu({ email }: { email: string }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          nativeButton={false}
           render={
             <button
               type="button"

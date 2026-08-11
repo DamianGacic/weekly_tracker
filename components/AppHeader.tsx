@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/store/AuthProvider";
 import { Button } from "@/components/ui/button";
+import { SetPasswordDialog } from "@/components/SetPasswordDialog";
 
 const NAV_LINKS = [
   { key: "week", href: "/", label: "This week" },
@@ -42,6 +43,7 @@ export function AppHeader({ active }: { active: "week" | "items" | "history" }) 
       {status === "authed" ? (
         <div className="flex items-center gap-3">
           {email && <span className="hidden text-xs text-muted-foreground sm:inline">{email}</span>}
+          <SetPasswordDialog />
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
             Sign out
           </Button>

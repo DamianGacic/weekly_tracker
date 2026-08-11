@@ -6,7 +6,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -36,7 +35,9 @@ export function AccountMenu({ email }: { email: string }) {
           {email.charAt(0).toUpperCase()}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel className="max-w-56 truncate font-normal">{email}</DropdownMenuLabel>
+          <div className="max-w-56 truncate px-1.5 py-1 text-xs font-medium text-muted-foreground">
+            {email}
+          </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setPasswordDialogOpen(true)}>
             Set password

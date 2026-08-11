@@ -5,6 +5,9 @@ import { localStore, clearLocalData } from "@/lib/store/local";
  * One-time upload of locally-tracked items/logs into a freshly signed-in
  * account. Only runs if the account has no items yet, so it's safe to call
  * on every sign-in without duplicating data on a second device or a re-login.
+ * Local data is only cleared once every item migrated successfully, so a
+ * partial failure (e.g. a name collision) leaves the source data intact
+ * instead of silently dropping it.
  */
 export async function migrateLocalDataToRemote(): Promise<void> {
   const supabase = createClient();
@@ -17,6 +20,7 @@ export async function migrateLocalDataToRemote(): Promise<void> {
   const localLogs = await localStore.listLogs();
 
   const idMap = new Map<string, string>();
+  let hadFailure = false;
   for (const item of localItems) {
     const { data, error } = await supabase
       .from("items")
@@ -29,7 +33,11 @@ export async function migrateLocalDataToRemote(): Promise<void> {
       })
       .select("id")
       .single();
-    if (error || !data) continue;
+    if (error || !data) {
+      hadFailure = true;
+      console.error("Failed to migrate item to Supabase:", item.name, error);
+      continue;
+    }
     idMap.set(item.id, data.id);
   }
 
@@ -41,8 +49,14 @@ export async function migrateLocalDataToRemote(): Promise<void> {
     .filter((log): log is { item_id: string; consumed_at: string } => log !== null);
 
   if (logsToInsert.length > 0) {
-    await supabase.from("logs").insert(logsToInsert);
+    const { error } = await supabase.from("logs").insert(logsToInsert);
+    if (error) {
+      hadFailure = true;
+      console.error("Failed to migrate logs to Supabase:", error);
+    }
   }
 
-  clearLocalData();
+  if (!hadFailure) {
+    clearLocalData();
+  }
 }

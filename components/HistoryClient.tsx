@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 type WeekTotals = { weekStart: Date; protein: number; carbs: number; fat: number; calories: number };
 
 export function HistoryClient() {
-  const { status } = useAuth();
+  const { status, syncVersion } = useAuth();
   const store = useMemo(() => storeFor(status), [status]);
 
   const [items, setItems] = useState<Item[]>([]);
@@ -29,7 +29,7 @@ export function HistoryClient() {
     return () => {
       active = false;
     };
-  }, [store, status]);
+  }, [store, status, syncVersion]);
 
   const weekStart = useMemo(() => getWeekStart(new Date()), []);
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);

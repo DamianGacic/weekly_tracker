@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { NewItemDialog } from "@/components/NewItemDialog";
 
 export function DashboardClient() {
-  const { status } = useAuth();
+  const { status, syncVersion } = useAuth();
   const store = useMemo(() => storeFor(status), [status]);
 
   const [items, setItems] = useState<Item[]>([]);
@@ -34,7 +34,7 @@ export function DashboardClient() {
     return () => {
       active = false;
     };
-  }, [store, status]);
+  }, [store, status, syncVersion]);
 
   const weekStart = useMemo(() => getWeekStart(new Date()), []);
   const now = new Date();

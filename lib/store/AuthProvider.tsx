@@ -9,13 +9,22 @@ import type { DataStore } from "@/lib/store/types";
 
 export type AuthStatus = "loading" | "anon" | "authed";
 
-type AuthContextValue = { status: AuthStatus; email: string | null };
+type AuthContextValue = { status: AuthStatus; email: string | null; syncVersion: number };
 
-const AuthContext = createContext<AuthContextValue>({ status: "loading", email: null });
+const AuthContext = createContext<AuthContextValue>({
+  status: "loading",
+  email: null,
+  syncVersion: 0,
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [email, setEmail] = useState<string | null>(null);
+  // Bumped once a post-sign-in local -> remote migration settles, so
+  // components fetching from the store know to re-fetch: the very first
+  // remote fetch right after sign-in can race ahead of that migration and
+  // land before it's done, and nothing else would tell them data changed.
+  const [syncVersion, setSyncVersion] = useState(0);
   const migratingRef = useRef(false);
 
   useEffect(() => {
@@ -30,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         migratingRef.current = true;
         migrateLocalDataToRemote().finally(() => {
           migratingRef.current = false;
+          if (active) setSyncVersion((v) => v + 1);
         });
       }
     }
@@ -46,7 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return <AuthContext.Provider value={{ status, email }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ status, email, syncVersion }}>{children}</AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

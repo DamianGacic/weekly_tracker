@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { NewItemDialog } from "@/components/NewItemDialog";
 
 export function ItemsClient() {
-  const { status } = useAuth();
+  const { status, syncVersion } = useAuth();
   const store = useMemo(() => storeFor(status), [status]);
 
   const [items, setItems] = useState<Item[]>([]);
@@ -25,7 +25,7 @@ export function ItemsClient() {
     return () => {
       active = false;
     };
-  }, [store, status]);
+  }, [store, status, syncVersion]);
 
   async function handleCreateItem(input: ItemInput) {
     const item = await store.createItem(input);

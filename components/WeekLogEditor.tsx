@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Minus } from "lucide-react";
 import type { DataStore, Item, ItemInput, LogEntry } from "@/lib/store/types";
 import { countLogsByItem } from "@/lib/macros";
@@ -10,6 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+
+// Grace period before the "logged" list re-sorts by count, so an item
+// doesn't jump position right after being clicked and cause a misclick on
+// the next tap.
+const RESORT_DELAY_MS = 4000;
 
 export function WeekLogEditor({
   items,
@@ -39,12 +44,44 @@ export function WeekLogEditor({
   const [query, setQuery] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pendingCatalogName, setPendingCatalogName] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const counts = useMemo(() => countLogsByItem(weekLogs), [weekLogs]);
 
+  // Sort key that lags behind `counts` by RESORT_DELAY_MS, so an item
+  // doesn't jump position right after being clicked and cause a misclick on
+  // the next tap. Falls back to the live count for anything not in the
+  // snapshot yet (a brand-new item just logged for the first time this
+  // week), so newly-appearing rows still show up immediately -- only
+  // *existing* rows' order is held stable.
+  const [sortSnapshot, setSortSnapshot] = useState<Map<string, number>>(() => new Map());
+  const resortTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    clearTimeout(resortTimer.current);
+    resortTimer.current = setTimeout(() => setSortSnapshot(new Map(counts)), RESORT_DELAY_MS);
+    return () => clearTimeout(resortTimer.current);
+  }, [counts]);
+
   const loggedItems = items
     .filter((item) => (counts.get(item.id) ?? 0) > 0)
-    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0));
+    .sort((a, b) => {
+      const aKey = sortSnapshot.get(a.id) ?? counts.get(a.id) ?? 0;
+      const bKey = sortSnapshot.get(b.id) ?? counts.get(b.id) ?? 0;
+      return bKey - aKey;
+    });
+
+  // Clicking outside the search input and its result lists clears the query.
+  useEffect(() => {
+    if (query.trim().length === 0) return;
+    function handlePointerDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [query]);
 
   const trimmedQuery = query.trim().toLowerCase();
 
@@ -117,49 +154,51 @@ export function WeekLogEditor({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <Input
-          placeholder="Search your items…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {actions}
+      <div ref={containerRef} className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search your items…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {actions}
+        </div>
+
+        {searchResults.length > 0 && (
+          <Card>
+            <CardContent className="flex flex-col gap-1">
+              {searchResults.map((item) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  count={counts.get(item.id) ?? 0}
+                  pending={pendingId === item.id}
+                  onAdd={() => logItem(item.id)}
+                  onSubtract={() => unlogItem(item.id)}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {catalogResults.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">More foods</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1">
+              {catalogResults.map((food) => (
+                <CatalogRow
+                  key={food.name}
+                  food={food}
+                  pending={pendingCatalogName === food.name}
+                  onAdd={() => logCatalogItem(food)}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
-
-      {searchResults.length > 0 && (
-        <Card>
-          <CardContent className="flex flex-col gap-1">
-            {searchResults.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                count={counts.get(item.id) ?? 0}
-                pending={pendingId === item.id}
-                onAdd={() => logItem(item.id)}
-                onSubtract={() => unlogItem(item.id)}
-              />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {catalogResults.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">More foods</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1">
-            {catalogResults.map((food) => (
-              <CatalogRow
-                key={food.name}
-                food={food}
-                pending={pendingCatalogName === food.name}
-                onAdd={() => logCatalogItem(food)}
-              />
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       {loggedItems.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>

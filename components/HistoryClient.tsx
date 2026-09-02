@@ -105,6 +105,7 @@ export function HistoryClient() {
                     isCurrentWeek={false}
                     store={store}
                     onLogsChange={setLogs}
+                    onItemsChange={setItems}
                     emptyLabel="Nothing logged that week."
                   />
                 </CardContent>

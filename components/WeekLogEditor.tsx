@@ -2,10 +2,11 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Minus } from "lucide-react";
-import type { DataStore, Item, LogEntry } from "@/lib/store/types";
+import type { DataStore, Item, ItemInput, LogEntry } from "@/lib/store/types";
 import { countLogsByItem } from "@/lib/macros";
 import { nextTempId } from "@/lib/tempId";
-import { Card, CardContent } from "@/components/ui/card";
+import { FOOD_CATALOG } from "@/lib/foodCatalog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -17,6 +18,7 @@ export function WeekLogEditor({
   isCurrentWeek,
   store,
   onLogsChange,
+  onItemsChange,
   emptyLabel = "Nothing logged yet — search above to add an item.",
   actions,
 }: {
@@ -28,12 +30,15 @@ export function WeekLogEditor({
   store: DataStore;
   /** Updates the full (all-weeks) log list the parent owns. */
   onLogsChange: (updater: (prev: LogEntry[]) => LogEntry[]) => void;
+  /** Updates the item list the parent owns, needed when a catalog food gets imported. */
+  onItemsChange: (updater: (prev: Item[]) => Item[]) => void;
   emptyLabel?: string;
   /** Rendered next to the search input, e.g. a "New item" button. */
   actions?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pendingCatalogName, setPendingCatalogName] = useState<string | null>(null);
 
   const counts = useMemo(() => countLogsByItem(weekLogs), [weekLogs]);
 
@@ -41,12 +46,21 @@ export function WeekLogEditor({
     .filter((item) => (counts.get(item.id) ?? 0) > 0)
     .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0));
 
+  const trimmedQuery = query.trim().toLowerCase();
+
   const searchResults =
-    query.trim().length === 0
+    trimmedQuery.length === 0
       ? []
-      : items
-          .filter((item) => item.name.toLowerCase().includes(query.trim().toLowerCase()))
-          .slice(0, 8);
+      : items.filter((item) => item.name.toLowerCase().includes(trimmedQuery)).slice(0, 8);
+
+  const catalogResults =
+    trimmedQuery.length === 0
+      ? []
+      : FOOD_CATALOG.filter(
+          (food) =>
+            food.name.toLowerCase().includes(trimmedQuery) &&
+            !items.some((item) => item.name.toLowerCase() === food.name.toLowerCase())
+        ).slice(0, 8);
 
   async function logItem(itemId: string) {
     setPendingId(itemId);
@@ -90,6 +104,17 @@ export function WeekLogEditor({
     setPendingId(null);
   }
 
+  async function logCatalogItem(food: ItemInput) {
+    setPendingCatalogName(food.name);
+    try {
+      const item = await store.createItem(food);
+      onItemsChange((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)));
+      await logItem(item.id);
+    } finally {
+      setPendingCatalogName(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -112,6 +137,24 @@ export function WeekLogEditor({
                 pending={pendingId === item.id}
                 onAdd={() => logItem(item.id)}
                 onSubtract={() => unlogItem(item.id)}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {catalogResults.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">More foods</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            {catalogResults.map((food) => (
+              <CatalogRow
+                key={food.name}
+                food={food}
+                pending={pendingCatalogName === food.name}
+                onAdd={() => logCatalogItem(food)}
               />
             ))}
           </CardContent>
@@ -183,5 +226,29 @@ function ItemRow({
         </div>
       )}
     </div>
+  );
+}
+
+function CatalogRow({
+  food,
+  pending,
+  onAdd,
+}: {
+  food: ItemInput;
+  pending: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      disabled={pending}
+      className="flex w-full flex-col items-start rounded-md px-2 py-2 text-left hover:bg-accent disabled:opacity-60"
+    >
+      <span className="font-medium">{food.name}</span>
+      <span className="text-xs text-muted-foreground">
+        P{food.protein} · C{food.carbs} · F{food.fat} · {food.calories} kcal
+      </span>
+    </button>
   );
 }

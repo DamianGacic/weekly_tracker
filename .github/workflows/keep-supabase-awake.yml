@@ -1,0 +1,37 @@
+name: Keep Supabase awake
+
+# Supabase pauses free projects after 7 days of low activity. A few database
+# requests a day keep this one counted as active. If it has paused anyway, the
+# run fails and GitHub emails the repo owner: restore it from the Supabase
+# dashboard.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query the database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          for table in items logs; do
+            curl --silent --show-error --fail-with-body --retry 3 --max-time 60 \
+              "$SUPABASE_URL/rest/v1/$table?select=id&limit=1" \
+              -H "apikey: $SUPABASE_ANON_KEY" \
+              -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+            echo
+          done
+
+      # GitHub disables scheduled workflows in public repos after 60 days
+      # without repo activity. Re-enabling this one resets that timer.
+      - name: Keep this schedule enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PUT "repos/${{ github.repository }}/actions/workflows/keep-supabase-awake.yml/enable"

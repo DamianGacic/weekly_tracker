@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { downloadExcelExport, downloadJsonExport } from "@/lib/export";
+import { remoteStore } from "@/lib/store/remote";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +19,14 @@ export function AccountMenu({ email }: { email: string }) {
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
+  }
+
+  async function handleExport(download: () => Promise<void>) {
+    try {
+      await download();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Could not export your data.");
+    }
   }
 
   return (
@@ -41,6 +51,12 @@ export function AccountMenu({ email }: { email: string }) {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setPasswordDialogOpen(true)}>
             Set password
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleExport(() => downloadExcelExport(remoteStore))}>
+            Export as Excel
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleExport(() => downloadJsonExport(remoteStore, email))}>
+            Export as JSON
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
             Sign out

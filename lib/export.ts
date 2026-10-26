@@ -25,9 +25,13 @@ function saveFile(blob: Blob, fileName: string) {
 
 /** Downloads everything in `store` as JSON: the complete backup, every log with its timestamp. */
 export async function downloadJsonExport(store: DataStore, account: string | null) {
-  const [items, logs] = await Promise.all([store.listItems(), store.listLogs()]);
+  const [items, logs, goals] = await Promise.all([
+    store.listItems(),
+    store.listLogs(),
+    store.getGoals(),
+  ]);
   const now = new Date();
-  const json = JSON.stringify({ exportedAt: now.toISOString(), account, items, logs }, null, 2);
+  const json = JSON.stringify({ exportedAt: now.toISOString(), account, items, logs, goals }, null, 2);
   saveFile(new Blob([json], { type: "application/json" }), `weekly-export-${localDateStamp(now)}.json`);
 }
 

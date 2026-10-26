@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Item, LogEntry, ItemInput } from "@/lib/store/types";
+import type { Item, LogEntry, ItemInput, Goals } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
 import { avgDaily, formatWeekLabel, getWeekStart, weekProgress } from "@/lib/week";
 import { countLogsByItem, sumMacros, round1 } from "@/lib/macros";
+import {
+  NO_GOALS,
+  calorieStatus,
+  goalForWeek,
+  proteinStatus,
+  type GoalStatus,
+} from "@/lib/goals";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GoalsCard } from "@/components/GoalsCard";
 import { ItemDialog } from "@/components/ItemDialog";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
 
@@ -15,15 +24,26 @@ export function DashboardClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [goals, setGoals] = useState<Goals>(NO_GOALS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (status === "loading") return;
     let active = true;
-    Promise.all([store.listItems(), store.listLogs()]).then(([loadedItems, loadedLogs]) => {
+    Promise.all([
+      store.listItems(),
+      store.listLogs(),
+      // Goals are optional, so failing to load them (e.g. the Supabase
+      // migration for them hasn't been run) shouldn't take the dashboard down.
+      store.getGoals().catch((err) => {
+        console.error("Could not load goals:", err);
+        return NO_GOALS;
+      }),
+    ]).then(([loadedItems, loadedLogs, loadedGoals]) => {
       if (!active) return;
       setItems(loadedItems);
       setLogs(loadedLogs);
+      setGoals(loadedGoals);
       setLoading(false);
     });
     return () => {
@@ -50,10 +70,17 @@ export function DashboardClient() {
     calories: avgDaily(totals.calories, { weekStart, now, isCurrentWeek: true }),
   };
 
+  const calorieLimit = goals.calories ? goalForWeek(goals.calories, weekStart) : null;
+  const proteinGoal = goals.protein ? goalForWeek(goals.protein, weekStart) : null;
+
   async function handleCreateItem(input: ItemInput) {
     const item = await store.createItem(input);
     setItems((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)));
     return item;
+  }
+
+  async function handleSaveGoals(next: Goals) {
+    setGoals(await store.saveGoals(next));
   }
 
   if (loading) {
@@ -61,32 +88,58 @@ export function DashboardClient() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>This week</CardTitle>
-          <p className="text-xs text-muted-foreground">{formatWeekLabel(weekStart)}</p>
-          <WeekProgressBar fraction={progress} />
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <MacroStat label="Protein" value={totals.protein} avg={avg.protein} unit="g" />
-          <MacroStat label="Carbs" value={totals.carbs} avg={avg.carbs} unit="g" />
-          <MacroStat label="Fat" value={totals.fat} avg={avg.fat} unit="g" />
-          <MacroStat label="Calories" value={totals.calories} avg={avg.calories} unit=" kcal" />
-        </CardContent>
-      </Card>
+    <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start">
+      <GoalsCard goals={goals} weekStart={weekStart} onSave={handleSaveGoals} />
 
-      <WeekLogEditor
-        items={items}
-        weekLogs={thisWeekLogs}
-        weekStart={weekStart}
-        isCurrentWeek
-        store={store}
-        onLogsChange={setLogs}
-        onItemsChange={setItems}
-        emptyLabel="Nothing logged yet — search above to add your first item."
-        actions={<ItemDialog mode="create" onSave={handleCreateItem} />}
-      />
+      <div className="flex min-w-0 flex-col gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>This week</CardTitle>
+            <p className="text-xs text-muted-foreground">{formatWeekLabel(weekStart)}</p>
+            <WeekProgressBar fraction={progress} />
+            <GoalBar
+              label="Calories"
+              emptyLabel="No limit set"
+              consumed={totals.calories}
+              target={calorieLimit}
+              unit=" kcal"
+              progress={progress}
+              status={
+                calorieLimit === null ? null : calorieStatus(totals.calories, calorieLimit, progress)
+              }
+            />
+            <GoalBar
+              label="Protein"
+              emptyLabel="No goal set"
+              consumed={totals.protein}
+              target={proteinGoal}
+              unit="g"
+              progress={progress}
+              status={
+                proteinGoal === null ? null : proteinStatus(totals.protein, proteinGoal, progress)
+              }
+            />
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <MacroStat label="Protein" value={totals.protein} avg={avg.protein} unit="g" />
+            <MacroStat label="Carbs" value={totals.carbs} avg={avg.carbs} unit="g" />
+            <MacroStat label="Fat" value={totals.fat} avg={avg.fat} unit="g" />
+            <MacroStat label="Calories" value={totals.calories} avg={avg.calories} unit=" kcal" />
+          </CardContent>
+        </Card>
+
+        <WeekLogEditor
+          items={items}
+          weekLogs={thisWeekLogs}
+          weekStart={weekStart}
+          isCurrentWeek
+          store={store}
+          onLogsChange={setLogs}
+          onItemsChange={setItems}
+          emptyLabel="Nothing logged yet — search above to add your first item."
+          actions={<ItemDialog mode="create" onSave={handleCreateItem} />}
+        />
+      </div>
     </div>
   );
 }
@@ -121,6 +174,83 @@ function WeekProgressBar({ fraction }: { fraction: number }) {
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+const STATUS_COLORS: Record<GoalStatus, string> = {
+  green: "bg-green-500",
+  yellow: "bg-yellow-400",
+  red: "bg-red-500",
+};
+
+/**
+ * Same size and scale as the week bar: full = the whole weekly goal, so its
+ * fill lines up against how much of the week has passed. The tick marks the
+ * pro-rata share for right now.
+ */
+function GoalBar({
+  label,
+  emptyLabel,
+  consumed,
+  target,
+  unit,
+  progress,
+  status,
+}: {
+  label: string;
+  emptyLabel: string;
+  consumed: number;
+  target: number | null;
+  unit: string;
+  progress: number;
+  status: GoalStatus | null;
+}) {
+  const fraction = target === null ? 0 : target > 0 ? Math.min(consumed / target, 1) : consumed > 0 ? 1 : 0;
+  const percent = Math.round(fraction * 100);
+  const pacePercent = Math.min(Math.max(progress, 0), 1) * 100;
+  return (
+    <div className="mt-2">
+      <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        {target === null ? (
+          <span className="text-muted-foreground">{emptyLabel}</span>
+        ) : (
+          <span>
+            {round1(consumed)} / {round1(target)}
+            {unit}
+          </span>
+        )}
+      </div>
+      <div className="relative">
+        <div
+          role="progressbar"
+          aria-label={`${label} so far this week`}
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          title={
+            target === null
+              ? undefined
+              : `${round1(target * progress)}${unit} would be right on pace by now`
+          }
+          className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+        >
+          {status && (
+            <div
+              className={cn("h-full rounded-full", STATUS_COLORS[status])}
+              style={{ width: `${fraction * 100}%` }}
+            />
+          )}
+        </div>
+        {target !== null && (
+          <span
+            aria-hidden
+            className="absolute -top-0.5 h-2.5 w-0.5 -translate-x-1/2 rounded-full bg-foreground/60"
+            style={{ left: `${pacePercent}%` }}
+          />
+        )}
       </div>
     </div>
   );

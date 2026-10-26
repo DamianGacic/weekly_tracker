@@ -1,8 +1,10 @@
-import type { DataStore, Item, LogEntry, ItemInput } from "@/lib/store/types";
+import type { DataStore, Goals, Item, LogEntry, ItemInput } from "@/lib/store/types";
 import { caloriesFor } from "@/lib/macros";
+import { NO_GOALS } from "@/lib/goals";
 
 const ITEMS_KEY = "weekly:items";
 const LOGS_KEY = "weekly:logs";
+const GOALS_KEY = "weekly:goals";
 
 function read<T>(key: string): T[] {
   if (typeof window === "undefined") return [];
@@ -23,6 +25,11 @@ export function clearLocalData() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(ITEMS_KEY);
   window.localStorage.removeItem(LOGS_KEY);
+}
+
+export function clearLocalGoals() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(GOALS_KEY);
 }
 
 export const localStore: DataStore = {
@@ -68,5 +75,20 @@ export const localStore: DataStore = {
       LOGS_KEY,
       read<LogEntry>(LOGS_KEY).filter((log) => log.id !== logId)
     );
+  },
+  async getGoals() {
+    if (typeof window === "undefined") return NO_GOALS;
+    try {
+      const raw = window.localStorage.getItem(GOALS_KEY);
+      return raw ? { ...NO_GOALS, ...(JSON.parse(raw) as Partial<Goals>) } : NO_GOALS;
+    } catch {
+      return NO_GOALS;
+    }
+  },
+  async saveGoals(goals: Goals) {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+    }
+    return goals;
   },
 };

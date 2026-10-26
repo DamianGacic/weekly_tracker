@@ -63,6 +63,45 @@ export type Database = {
           },
         ];
       };
+      goals: {
+        Row: {
+          user_id: string;
+          protein_value: number | null;
+          protein_anchor_week: string | null;
+          protein_step: number;
+          protein_step_mode: "flat" | "percent";
+          calories_value: number | null;
+          calories_anchor_week: string | null;
+          calories_step: number;
+          calories_step_mode: "flat" | "percent";
+          updated_at: string;
+        };
+        Insert: {
+          user_id?: string;
+          protein_value?: number | null;
+          protein_anchor_week?: string | null;
+          protein_step?: number;
+          protein_step_mode?: "flat" | "percent";
+          calories_value?: number | null;
+          calories_anchor_week?: string | null;
+          calories_step?: number;
+          calories_step_mode?: "flat" | "percent";
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          protein_value?: number | null;
+          protein_anchor_week?: string | null;
+          protein_step?: number;
+          protein_step_mode?: "flat" | "percent";
+          calories_value?: number | null;
+          calories_anchor_week?: string | null;
+          calories_step?: number;
+          calories_step_mode?: "flat" | "percent";
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

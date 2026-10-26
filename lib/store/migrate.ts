@@ -1,5 +1,24 @@
 import { createClient } from "@/lib/supabase/client";
-import { localStore, clearLocalData } from "@/lib/store/local";
+import { localStore, clearLocalData, clearLocalGoals } from "@/lib/store/local";
+import { remoteStore } from "@/lib/store/remote";
+
+/**
+ * Goals set while signed out are uploaded only if the account has no goals
+ * of its own yet — same "don't clobber an existing account" rule as items.
+ */
+async function migrateLocalGoalsToRemote(): Promise<void> {
+  const localGoals = await localStore.getGoals();
+  if (!localGoals.protein && !localGoals.calories) return;
+
+  try {
+    const remoteGoals = await remoteStore.getGoals();
+    if (remoteGoals.protein || remoteGoals.calories) return;
+    await remoteStore.saveGoals(localGoals);
+    clearLocalGoals();
+  } catch (err) {
+    console.error("Failed to migrate goals to Supabase:", err);
+  }
+}
 
 /**
  * One-time upload of locally-tracked items/logs into a freshly signed-in
@@ -10,6 +29,8 @@ import { localStore, clearLocalData } from "@/lib/store/local";
  * instead of silently dropping it.
  */
 export async function migrateLocalDataToRemote(): Promise<void> {
+  await migrateLocalGoalsToRemote();
+
   const supabase = createClient();
 
   const { count } = await supabase.from("items").select("id", { count: "exact", head: true });

@@ -1,8 +1,33 @@
 import { createClient } from "@/lib/supabase/client";
-import type { DataStore, ItemInput } from "@/lib/store/types";
+import type { Database } from "@/lib/supabase/types";
+import type { DataStore, Goal, Goals, ItemInput } from "@/lib/store/types";
+import { NO_GOALS } from "@/lib/goals";
 
 const ITEM_COLUMNS = "id, name, protein, carbs, fat, calories, created_at";
 const LOG_COLUMNS = "id, item_id, consumed_at";
+const GOAL_COLUMNS =
+  "protein_value, protein_anchor_week, protein_step, protein_step_mode, calories_value, calories_anchor_week, calories_step, calories_step_mode";
+
+type GoalsRow = Database["public"]["Tables"]["goals"]["Row"];
+
+function goalsFromRow(row: Omit<GoalsRow, "user_id" | "updated_at">): Goals {
+  const toGoal = (
+    value: number | null,
+    anchorWeek: string | null,
+    step: number,
+    stepMode: Goal["stepMode"]
+  ): Goal | null =>
+    value === null || anchorWeek === null ? null : { value, anchorWeek, step, stepMode };
+  return {
+    protein: toGoal(row.protein_value, row.protein_anchor_week, row.protein_step, row.protein_step_mode),
+    calories: toGoal(
+      row.calories_value,
+      row.calories_anchor_week,
+      row.calories_step,
+      row.calories_step_mode
+    ),
+  };
+}
 
 export const remoteStore: DataStore = {
   async listItems() {
@@ -52,5 +77,36 @@ export const remoteStore: DataStore = {
     const supabase = createClient();
     const { error } = await supabase.from("logs").delete().eq("id", logId);
     if (error) throw error;
+  },
+  async getGoals() {
+    const supabase = createClient();
+    const { data, error } = await supabase.from("goals").select(GOAL_COLUMNS).maybeSingle();
+    if (error) throw error;
+    return data ? goalsFromRow(data) : NO_GOALS;
+  },
+  async saveGoals(goals: Goals) {
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not signed in.");
+    const { data, error } = await supabase
+      .from("goals")
+      .upsert({
+        user_id: session.user.id,
+        protein_value: goals.protein?.value ?? null,
+        protein_anchor_week: goals.protein?.anchorWeek ?? null,
+        protein_step: goals.protein?.step ?? 0,
+        protein_step_mode: goals.protein?.stepMode ?? "flat",
+        calories_value: goals.calories?.value ?? null,
+        calories_anchor_week: goals.calories?.anchorWeek ?? null,
+        calories_step: goals.calories?.step ?? 0,
+        calories_step_mode: goals.calories?.stepMode ?? "flat",
+        updated_at: new Date().toISOString(),
+      })
+      .select(GOAL_COLUMNS)
+      .single();
+    if (error || !data) throw error ?? new Error("Could not save goals.");
+    return goalsFromRow(data);
   },
 };

@@ -8,6 +8,7 @@ import { portionsByItem, sumMacros, round1 } from "@/lib/macros";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
+import { MacroSplitSummary } from "@/components/MacroSplit";
 
 type WeekGroup = { weekStart: Date; weekLogs: LogEntry[] };
 
@@ -95,6 +96,9 @@ export function HistoryClient() {
                   now={now}
                   unit=" kcal"
                 />
+              </CardContent>
+              <CardContent>
+                <MacroSplitSummary macros={totals} />
               </CardContent>
               {expanded && (
                 <CardContent>

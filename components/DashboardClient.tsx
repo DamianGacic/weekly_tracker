@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GoalsCard } from "@/components/GoalsCard";
+import { MacroSplitSummary } from "@/components/MacroSplit";
 import { ItemDialog } from "@/components/ItemDialog";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
 
@@ -125,6 +126,9 @@ export function DashboardClient() {
             <MacroStat label="Carbs" value={totals.carbs} avg={avg.carbs} unit="g" />
             <MacroStat label="Fat" value={totals.fat} avg={avg.fat} unit="g" />
             <MacroStat label="Calories" value={totals.calories} avg={avg.calories} unit=" kcal" />
+          </CardContent>
+          <CardContent>
+            <MacroSplitSummary macros={totals} />
           </CardContent>
         </Card>
 

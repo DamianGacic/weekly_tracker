@@ -75,10 +75,11 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  /* Macro split colors: a validated colorblind-safe categorical trio. */
-  --macro-protein: #2a78d6;
-  --macro-carbs: #eb6834;
-  --macro-fat: #1baf7a;
+  /* Macro split colors (plum, wheat, olive-leaning green), checked to stay
+     distinguishable with red-green colorblindness. */
+  --macro-protein: #8874a5;
+  --macro-carbs: #c28c3a;
+  --macro-fat: #497f2a;
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -114,9 +115,9 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --macro-protein: #3987e5;
-  --macro-carbs: #d95926;
-  --macro-fat: #199e70;
+  --macro-protein: #8874a5;
+  --macro-carbs: #bc8734;
+  --macro-fat: #3e731d;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

@@ -40,18 +40,21 @@ export type Database = {
           user_id: string;
           item_id: string;
           consumed_at: string;
+          amount: number;
         };
         Insert: {
           id?: string;
           user_id?: string;
           item_id: string;
           consumed_at?: string;
+          amount?: number;
         };
         Update: {
           id?: string;
           user_id?: string;
           item_id?: string;
           consumed_at?: string;
+          amount?: number;
         };
         Relationships: [
           {

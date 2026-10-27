@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Item, LogEntry, ItemInput, Goals } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
 import { avgDaily, formatWeekLabel, getWeekStart, weekProgress } from "@/lib/week";
-import { countLogsByItem, sumMacros, round1 } from "@/lib/macros";
+import { portionsByItem, sumMacros, round1 } from "@/lib/macros";
 import {
   NO_GOALS,
   calorieStatus,
@@ -58,8 +58,8 @@ export function DashboardClient() {
     () => logs.filter((log) => new Date(log.consumed_at) >= weekStart),
     [logs, weekStart]
   );
-  const counts = useMemo(() => countLogsByItem(thisWeekLogs), [thisWeekLogs]);
-  const totals = useMemo(() => sumMacros(items, counts), [items, counts]);
+  const portions = useMemo(() => portionsByItem(thisWeekLogs), [thisWeekLogs]);
+  const totals = useMemo(() => sumMacros(items, portions), [items, portions]);
 
   const progress = weekProgress(weekStart, now);
 

@@ -65,9 +65,13 @@ export async function migrateLocalDataToRemote(): Promise<void> {
   const logsToInsert = localLogs
     .map((log) => {
       const remoteItemId = idMap.get(log.item_id);
-      return remoteItemId ? { item_id: remoteItemId, consumed_at: log.consumed_at } : null;
+      return remoteItemId
+        ? { item_id: remoteItemId, consumed_at: log.consumed_at, amount: log.amount }
+        : null;
     })
-    .filter((log): log is { item_id: string; consumed_at: string } => log !== null);
+    .filter(
+      (log): log is { item_id: string; consumed_at: string; amount: number } => log !== null
+    );
 
   if (logsToInsert.length > 0) {
     const { error } = await supabase.from("logs").insert(logsToInsert);

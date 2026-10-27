@@ -3,15 +3,18 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Minus } from "lucide-react";
 import type { DataStore, Item, ItemInput, LogEntry } from "@/lib/store/types";
-import { countLogsByItem } from "@/lib/macros";
+import { macrosFor, portionsByItem } from "@/lib/macros";
+import { formatAmount } from "@/lib/number";
 import { nextTempId } from "@/lib/tempId";
 import { FOOD_CATALOG } from "@/lib/foodCatalog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { MacroLine, MacroPie } from "@/components/MacroSplit";
+import { PortionDialog } from "@/components/PortionDialog";
 
-// Grace period before the "logged" list re-sorts by count, so an item
+// Grace period before the "logged" list re-sorts by calories, so an item
 // doesn't jump position right after being clicked and cause a misclick on
 // the next tap.
 const RESORT_DELAY_MS = 4000;
@@ -44,30 +47,39 @@ export function WeekLogEditor({
   const [query, setQuery] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pendingCatalogName, setPendingCatalogName] = useState<string | null>(null);
+  const [partialItem, setPartialItem] = useState<Item | null>(null);
+  const [partialOpen, setPartialOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const counts = useMemo(() => countLogsByItem(weekLogs), [weekLogs]);
+  const portions = useMemo(() => portionsByItem(weekLogs), [weekLogs]);
+  const caloriesByItem = useMemo(
+    () => new Map(items.map((item) => [item.id, macrosFor(item, portions.get(item.id) ?? 0).calories])),
+    [items, portions]
+  );
 
-  // Sort key that lags behind `counts` by RESORT_DELAY_MS, so an item
-  // doesn't jump position right after being clicked and cause a misclick on
-  // the next tap. Falls back to the live count for anything not in the
-  // snapshot yet (a brand-new item just logged for the first time this
-  // week), so newly-appearing rows still show up immediately -- only
-  // *existing* rows' order is held stable.
+  // Sort key (the item's calories this week) that lags behind by
+  // RESORT_DELAY_MS, so an item doesn't jump position right after being
+  // clicked and cause a misclick on the next tap. Falls back to the live
+  // value for anything not in the snapshot yet (a brand-new item just
+  // logged for the first time this week), so newly-appearing rows still
+  // show up immediately -- only *existing* rows' order is held stable.
   const [sortSnapshot, setSortSnapshot] = useState<Map<string, number>>(() => new Map());
   const resortTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     clearTimeout(resortTimer.current);
-    resortTimer.current = setTimeout(() => setSortSnapshot(new Map(counts)), RESORT_DELAY_MS);
+    resortTimer.current = setTimeout(
+      () => setSortSnapshot(new Map(caloriesByItem)),
+      RESORT_DELAY_MS
+    );
     return () => clearTimeout(resortTimer.current);
-  }, [counts]);
+  }, [caloriesByItem]);
 
   const loggedItems = items
-    .filter((item) => (counts.get(item.id) ?? 0) > 0)
+    .filter((item) => (portions.get(item.id) ?? 0) > 0)
     .sort((a, b) => {
-      const aKey = sortSnapshot.get(a.id) ?? counts.get(a.id) ?? 0;
-      const bKey = sortSnapshot.get(b.id) ?? counts.get(b.id) ?? 0;
+      const aKey = sortSnapshot.get(a.id) ?? caloriesByItem.get(a.id) ?? 0;
+      const bKey = sortSnapshot.get(b.id) ?? caloriesByItem.get(b.id) ?? 0;
       return bKey - aKey;
     });
 
@@ -99,7 +111,7 @@ export function WeekLogEditor({
             !items.some((item) => item.name.toLowerCase() === food.name.toLowerCase())
         ).slice(0, 8);
 
-  async function logItem(itemId: string) {
+  async function logItem(itemId: string, amount = 1) {
     setPendingId(itemId);
     const tempId = nextTempId();
     // Current week: log at the real time it happened. Past week: any
@@ -112,11 +124,12 @@ export function WeekLogEditor({
       id: tempId,
       item_id: itemId,
       consumed_at: consumedAt.toISOString(),
+      amount,
     };
     onLogsChange((prev) => [...prev, optimisticLog]);
 
     try {
-      const log = await store.logItem(itemId, consumedAt.toISOString());
+      const log = await store.logItem(itemId, consumedAt.toISOString(), amount);
       onLogsChange((prev) => prev.map((l) => (l.id === tempId ? log : l)));
     } catch {
       onLogsChange((prev) => prev.filter((l) => l.id !== tempId));
@@ -152,6 +165,11 @@ export function WeekLogEditor({
     }
   }
 
+  function openPartial(item: Item) {
+    setPartialItem(item);
+    setPartialOpen(true);
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div ref={containerRef} className="flex flex-col gap-3">
@@ -171,10 +189,12 @@ export function WeekLogEditor({
                 <ItemRow
                   key={item.id}
                   item={item}
-                  count={counts.get(item.id) ?? 0}
+                  portions={portions.get(item.id) ?? 0}
+                  showTotals={false}
                   pending={pendingId === item.id}
                   onAdd={() => logItem(item.id)}
                   onSubtract={() => unlogItem(item.id)}
+                  onPartial={() => openPartial(item)}
                 />
               ))}
             </CardContent>
@@ -210,60 +230,91 @@ export function WeekLogEditor({
                 {i > 0 && <Separator className="my-1" />}
                 <ItemRow
                   item={item}
-                  count={counts.get(item.id) ?? 0}
+                  portions={portions.get(item.id) ?? 0}
+                  showTotals
                   pending={pendingId === item.id}
                   onAdd={() => logItem(item.id)}
                   onSubtract={() => unlogItem(item.id)}
+                  onPartial={() => openPartial(item)}
                 />
               </div>
             ))}
           </CardContent>
         </Card>
       )}
+
+      <PortionDialog
+        item={partialItem}
+        open={partialOpen}
+        onOpenChange={setPartialOpen}
+        onLog={(amount) => partialItem && logItem(partialItem.id, amount)}
+      />
     </div>
   );
 }
 
+const ROUND_BUTTON =
+  "flex size-5 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-60";
+
 function ItemRow({
   item,
-  count,
+  portions,
+  showTotals,
   pending,
   onAdd,
   onSubtract,
+  onPartial,
 }: {
   item: Item;
-  count: number;
+  /** Portions logged this week. */
+  portions: number;
+  /** Show the macros for everything logged this week rather than for one portion. */
+  showTotals: boolean;
   pending: boolean;
   onAdd: () => void;
   onSubtract: () => void;
+  onPartial: () => void;
 }) {
   return (
-    <div className="flex w-full items-center justify-between rounded-md px-2 py-2 hover:bg-accent">
+    <div className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-accent">
       <button
         type="button"
         onClick={onAdd}
         disabled={pending}
-        className="flex flex-1 flex-col items-start text-left disabled:opacity-60"
+        className="flex min-w-0 flex-1 items-center gap-2.5 text-left disabled:opacity-60"
       >
-        <span className="font-medium">{item.name}</span>
-        <span className="text-xs text-muted-foreground">
-          P{item.protein} · C{item.carbs} · F{item.fat} · {item.calories} kcal
+        <MacroPie macros={item} />
+        <span className="flex min-w-0 flex-col items-start">
+          <span className="font-medium">{item.name}</span>
+          <MacroLine macros={macrosFor(item, showTotals ? portions : 1)} />
         </span>
       </button>
-      {count > 0 && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onSubtract}
-            disabled={pending}
-            aria-label={`Remove one ${item.name}`}
-            className="flex size-5 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-60"
-          >
-            <Minus className="size-3" />
-          </button>
-          <Badge variant="secondary">×{count}</Badge>
-        </div>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {portions > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={onSubtract}
+              disabled={pending}
+              aria-label={`Undo the last ${item.name} you logged`}
+              className={ROUND_BUTTON}
+            >
+              <Minus className="size-3" />
+            </button>
+            <Badge variant="secondary">×{formatAmount(portions)}</Badge>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={onPartial}
+          disabled={pending}
+          aria-label={`Log a partial amount of ${item.name}`}
+          title="Log a partial amount"
+          className={`${ROUND_BUTTON} text-[10px] leading-none`}
+        >
+          ½
+        </button>
+      </div>
     </div>
   );
 }
@@ -282,11 +333,12 @@ function CatalogRow({
       type="button"
       onClick={onAdd}
       disabled={pending}
-      className="flex w-full flex-col items-start rounded-md px-2 py-2 text-left hover:bg-accent disabled:opacity-60"
+      className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-accent disabled:opacity-60"
     >
-      <span className="font-medium">{food.name}</span>
-      <span className="text-xs text-muted-foreground">
-        P{food.protein} · C{food.carbs} · F{food.fat} · {food.calories} kcal
+      <MacroPie macros={food} />
+      <span className="flex min-w-0 flex-col items-start">
+        <span className="font-medium">{food.name}</span>
+        <MacroLine macros={food} />
       </span>
     </button>
   );

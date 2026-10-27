@@ -1,6 +1,6 @@
 import type { Cell, Row, Sheet } from "write-excel-file/browser";
 import type { DataStore, Item, LogEntry } from "@/lib/store/types";
-import { countLogsByItem, round1, sumMacros, type MacroTotals } from "@/lib/macros";
+import { macrosFor, portionsByItem, round1, sumMacros, type MacroTotals } from "@/lib/macros";
 import { getISOWeek, getWeekStart } from "@/lib/week";
 
 function localDateStamp(date: Date) {
@@ -35,14 +35,14 @@ export async function downloadJsonExport(store: DataStore, account: string | nul
   saveFile(new Blob([json], { type: "application/json" }), `weekly-export-${localDateStamp(now)}.json`);
 }
 
-const HEADER = ["Week", "Week of", "Item", "Times", "Protein g", "Carbs g", "Fat g", "kcal"];
-const COLUMN_WIDTHS = [6, 11, 28, 6, 10, 9, 7, 8].map((width) => ({ width }));
+const HEADER = ["Week", "Week of", "Item", "Portions", "Protein g", "Carbs g", "Fat g", "kcal"];
+const COLUMN_WIDTHS = [6, 11, 28, 8, 10, 9, 7, 8].map((width) => ({ width }));
 
 function macroRow(
   week: number,
   weekOf: Date,
   label: string,
-  count: number,
+  portions: number,
   macros: MacroTotals,
   bold: boolean
 ): Row {
@@ -52,7 +52,7 @@ function macroRow(
     cell(week),
     { value: weekOf, format: "yyyy-mm-dd", fontWeight },
     cell(label),
-    cell(count),
+    cell(Math.round(portions * 100) / 100),
     cell(round1(macros.protein)),
     cell(round1(macros.carbs)),
     cell(round1(macros.fat)),
@@ -67,17 +67,18 @@ function weekRows(weekStart: Date, weekLogs: LogEntry[], items: Item[]): Row[] {
   const weekOf = new Date(
     Date.UTC(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate())
   );
-  const counts = countLogsByItem(weekLogs);
+  const portions = portionsByItem(weekLogs);
+  // Same order as the app's week list: most calories first.
   const weekItems = items
-    .filter((item) => counts.has(item.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .filter((item) => portions.has(item.id))
+    .map((item) => ({ item, macros: macrosFor(item, portions.get(item.id)!) }))
+    .sort((a, b) => b.macros.calories - a.macros.calories);
 
-  const rows = weekItems.map((item) => {
-    const count = counts.get(item.id)!;
-    return macroRow(week, weekOf, item.name, count, sumMacros([item], counts), false);
-  });
-  const totalCount = weekItems.reduce((sum, item) => sum + counts.get(item.id)!, 0);
-  rows.push(macroRow(week, weekOf, "Total", totalCount, sumMacros(items, counts), true));
+  const rows = weekItems.map(({ item, macros }) =>
+    macroRow(week, weekOf, item.name, portions.get(item.id)!, macros, false)
+  );
+  const totalPortions = weekItems.reduce((sum, { item }) => sum + portions.get(item.id)!, 0);
+  rows.push(macroRow(week, weekOf, "Total", totalPortions, sumMacros(items, portions), true));
   return rows;
 }
 

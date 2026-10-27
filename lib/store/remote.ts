@@ -4,7 +4,7 @@ import type { DataStore, Goal, Goals, ItemInput } from "@/lib/store/types";
 import { NO_GOALS } from "@/lib/goals";
 
 const ITEM_COLUMNS = "id, name, protein, carbs, fat, calories, created_at";
-const LOG_COLUMNS = "id, item_id, consumed_at";
+const LOG_COLUMNS = "id, item_id, consumed_at, amount";
 const GOAL_COLUMNS =
   "protein_value, protein_anchor_week, protein_step, protein_step_mode, calories_value, calories_anchor_week, calories_step, calories_step_mode";
 
@@ -63,11 +63,15 @@ export const remoteStore: DataStore = {
     if (error || !data) throw error ?? new Error("Could not update item.");
     return data;
   },
-  async logItem(itemId: string, consumedAt?: string) {
+  async logItem(itemId: string, consumedAt?: string, amount = 1) {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("logs")
-      .insert(consumedAt ? { item_id: itemId, consumed_at: consumedAt } : { item_id: itemId })
+      .insert(
+        consumedAt
+          ? { item_id: itemId, consumed_at: consumedAt, amount }
+          : { item_id: itemId, amount }
+      )
       .select(LOG_COLUMNS)
       .single();
     if (error || !data) throw error ?? new Error("Could not log item.");

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Item, LogEntry } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
 import { getWeekStart, avgDaily, formatWeekRange, formatWeekLabel } from "@/lib/week";
-import { countLogsByItem, sumMacros, round1 } from "@/lib/macros";
+import { portionsByItem, sumMacros, round1 } from "@/lib/macros";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
@@ -64,8 +64,8 @@ export function HistoryClient() {
         weekGroups.map(({ weekStart: ws, weekLogs }) => {
           const key = ws.getTime();
           const expanded = expandedKey === key;
-          const counts = countLogsByItem(weekLogs);
-          const totals = sumMacros(items, counts);
+          const portions = portionsByItem(weekLogs);
+          const totals = sumMacros(items, portions);
           const now = new Date();
           return (
             <Card key={key}>

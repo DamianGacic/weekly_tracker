@@ -41,7 +41,8 @@ export const localStore: DataStore = {
     }));
   },
   async listLogs() {
-    return read<LogEntry>(LOGS_KEY);
+    // Older locally-stored logs predate partial amounts — each one was a whole portion.
+    return read<LogEntry>(LOGS_KEY).map((log) => ({ ...log, amount: log.amount ?? 1 }));
   },
   async createItem(input: ItemInput) {
     const item: Item = {
@@ -61,11 +62,12 @@ export const localStore: DataStore = {
     write(ITEMS_KEY, items);
     return updated;
   },
-  async logItem(itemId: string, consumedAt?: string) {
+  async logItem(itemId: string, consumedAt?: string, amount = 1) {
     const log: LogEntry = {
       id: crypto.randomUUID(),
       item_id: itemId,
       consumed_at: consumedAt ?? new Date().toISOString(),
+      amount,
     };
     write(LOGS_KEY, [...read<LogEntry>(LOGS_KEY), log]);
     return log;

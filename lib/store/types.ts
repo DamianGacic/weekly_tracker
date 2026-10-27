@@ -12,6 +12,8 @@ export type LogEntry = {
   id: string;
   item_id: string;
   consumed_at: string;
+  /** Portions of the item this log stands for: 1 per tap, or e.g. 0.5 for half a portion. */
+  amount: number;
 };
 
 export type ItemInput = {
@@ -48,8 +50,11 @@ export interface DataStore {
   listLogs(): Promise<LogEntry[]>;
   createItem(input: ItemInput): Promise<Item>;
   updateItem(itemId: string, input: ItemInput): Promise<Item>;
-  /** `consumedAt` defaults to now; pass it explicitly to log into a past week. */
-  logItem(itemId: string, consumedAt?: string): Promise<LogEntry>;
+  /**
+   * `consumedAt` defaults to now; pass it explicitly to log into a past week.
+   * `amount` is in portions and defaults to 1.
+   */
+  logItem(itemId: string, consumedAt?: string, amount?: number): Promise<LogEntry>;
   deleteLog(logId: string): Promise<void>;
   getGoals(): Promise<Goals>;
   saveGoals(goals: Goals): Promise<Goals>;

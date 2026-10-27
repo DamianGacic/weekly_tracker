@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Item, LogEntry, ItemInput, Goals } from "@/lib/store/types";
+import type { Item, LogEntry, ItemInput, Goals, WeekNotes } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
-import { avgDaily, formatWeekLabel, getWeekStart, weekProgress } from "@/lib/week";
+import { avgDaily, formatWeekLabel, getWeekStart, localDateKey, weekProgress } from "@/lib/week";
 import { portionsByItem, sumMacros, round1 } from "@/lib/macros";
 import {
   NO_GOALS,
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GoalsCard } from "@/components/GoalsCard";
 import { MacroSplitSummary } from "@/components/MacroSplit";
+import { WeekNote, withWeekNote } from "@/components/WeekNote";
 import { ItemDialog } from "@/components/ItemDialog";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
 
@@ -26,6 +27,7 @@ export function DashboardClient() {
   const [items, setItems] = useState<Item[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [goals, setGoals] = useState<Goals>(NO_GOALS);
+  const [notes, setNotes] = useState<WeekNotes>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,11 +42,17 @@ export function DashboardClient() {
         console.error("Could not load goals:", err);
         return NO_GOALS;
       }),
-    ]).then(([loadedItems, loadedLogs, loadedGoals]) => {
+      // Same for notes.
+      store.listWeekNotes().catch((err) => {
+        console.error("Could not load week notes:", err);
+        return {};
+      }),
+    ]).then(([loadedItems, loadedLogs, loadedGoals, loadedNotes]) => {
       if (!active) return;
       setItems(loadedItems);
       setLogs(loadedLogs);
       setGoals(loadedGoals);
+      setNotes(loadedNotes);
       setLoading(false);
     });
     return () => {
@@ -53,6 +61,7 @@ export function DashboardClient() {
   }, [store, status, syncVersion]);
 
   const weekStart = useMemo(() => getWeekStart(new Date()), []);
+  const weekKey = localDateKey(weekStart);
   const now = new Date();
 
   const thisWeekLogs = useMemo(
@@ -129,6 +138,14 @@ export function DashboardClient() {
           </CardContent>
           <CardContent>
             <MacroSplitSummary macros={totals} />
+          </CardContent>
+          <CardContent>
+            <WeekNote
+              weekKey={weekKey}
+              note={notes[weekKey] ?? ""}
+              store={store}
+              onSaved={(key, note) => setNotes((prev) => withWeekNote(prev, key, note))}
+            />
           </CardContent>
         </Card>
 

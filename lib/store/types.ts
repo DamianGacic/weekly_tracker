@@ -45,6 +45,9 @@ export type Goals = {
   calories: Goal | null;
 };
 
+/** Each week's note, keyed by that week's Monday as "YYYY-MM-DD" (see `localDateKey`). */
+export type WeekNotes = Record<string, string>;
+
 export interface DataStore {
   listItems(): Promise<Item[]>;
   listLogs(): Promise<LogEntry[]>;
@@ -58,4 +61,7 @@ export interface DataStore {
   deleteLog(logId: string): Promise<void>;
   getGoals(): Promise<Goals>;
   saveGoals(goals: Goals): Promise<Goals>;
+  listWeekNotes(): Promise<WeekNotes>;
+  /** Saves the note for the week keyed `weekKey`; a blank note removes it. */
+  saveWeekNote(weekKey: string, note: string): Promise<void>;
 }

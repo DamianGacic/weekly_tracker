@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Item, LogEntry } from "@/lib/store/types";
+import type { Item, LogEntry, WeekNotes } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
-import { getWeekStart, avgDaily, formatWeekRange, formatWeekLabel } from "@/lib/week";
+import { getWeekStart, avgDaily, formatWeekRange, formatWeekLabel, localDateKey } from "@/lib/week";
 import { portionsByItem, sumMacros, round1 } from "@/lib/macros";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
 import { MacroSplitSummary } from "@/components/MacroSplit";
+import { WeekNote, WeekNoteView, withWeekNote } from "@/components/WeekNote";
 
 type WeekGroup = { weekStart: Date; weekLogs: LogEntry[] };
 
@@ -18,16 +19,26 @@ export function HistoryClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [notes, setNotes] = useState<WeekNotes>({});
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState<number | null>(null);
 
   useEffect(() => {
     if (status === "loading") return;
     let active = true;
-    Promise.all([store.listItems(), store.listLogs()]).then(([loadedItems, loadedLogs]) => {
+    Promise.all([
+      store.listItems(),
+      store.listLogs(),
+      // Notes are optional, so failing to load them shouldn't take History down.
+      store.listWeekNotes().catch((err) => {
+        console.error("Could not load week notes:", err);
+        return {};
+      }),
+    ]).then(([loadedItems, loadedLogs, loadedNotes]) => {
       if (!active) return;
       setItems(loadedItems);
       setLogs(loadedLogs);
+      setNotes(loadedNotes);
       setLoading(false);
     });
     return () => {
@@ -67,6 +78,8 @@ export function HistoryClient() {
           const expanded = expandedKey === key;
           const portions = portionsByItem(weekLogs);
           const totals = sumMacros(items, portions);
+          const weekKey = localDateKey(ws);
+          const note = notes[weekKey] ?? "";
           const now = new Date();
           return (
             <Card key={key}>
@@ -100,8 +113,19 @@ export function HistoryClient() {
               <CardContent>
                 <MacroSplitSummary macros={totals} />
               </CardContent>
-              {expanded && (
+              {!expanded && note.trim() !== "" && (
                 <CardContent>
+                  <WeekNoteView note={note} />
+                </CardContent>
+              )}
+              {expanded && (
+                <CardContent className="flex flex-col gap-4">
+                  <WeekNote
+                    weekKey={weekKey}
+                    note={note}
+                    store={store}
+                    onSaved={(key, saved) => setNotes((prev) => withWeekNote(prev, key, saved))}
+                  />
                   <WeekLogEditor
                     items={items}
                     weekLogs={weekLogs}

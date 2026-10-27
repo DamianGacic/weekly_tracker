@@ -1,12 +1,7 @@
 import type { Cell, Row, Sheet } from "write-excel-file/browser";
 import type { DataStore, Item, LogEntry } from "@/lib/store/types";
 import { macrosFor, portionsByItem, round1, sumMacros, type MacroTotals } from "@/lib/macros";
-import { getISOWeek, getWeekStart } from "@/lib/week";
-
-function localDateStamp(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
+import { getISOWeek, getWeekStart, localDateKey } from "@/lib/week";
 
 function saveFile(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -25,18 +20,23 @@ function saveFile(blob: Blob, fileName: string) {
 
 /** Downloads everything in `store` as JSON: the complete backup, every log with its timestamp. */
 export async function downloadJsonExport(store: DataStore, account: string | null) {
-  const [items, logs, goals] = await Promise.all([
+  const [items, logs, goals, notes] = await Promise.all([
     store.listItems(),
     store.listLogs(),
     store.getGoals(),
+    store.listWeekNotes(),
   ]);
   const now = new Date();
-  const json = JSON.stringify({ exportedAt: now.toISOString(), account, items, logs, goals }, null, 2);
-  saveFile(new Blob([json], { type: "application/json" }), `weekly-export-${localDateStamp(now)}.json`);
+  const json = JSON.stringify(
+    { exportedAt: now.toISOString(), account, items, logs, goals, notes },
+    null,
+    2
+  );
+  saveFile(new Blob([json], { type: "application/json" }), `weekly-export-${localDateKey(now)}.json`);
 }
 
-const HEADER = ["Week", "Week of", "Item", "Portions", "Protein g", "Carbs g", "Fat g", "kcal"];
-const COLUMN_WIDTHS = [6, 11, 28, 8, 10, 9, 7, 8].map((width) => ({ width }));
+const HEADER = ["Week", "Week of", "Item", "Portions", "Protein g", "Carbs g", "Fat g", "kcal", "Note"];
+const COLUMN_WIDTHS = [6, 11, 28, 8, 10, 9, 7, 8, 40].map((width) => ({ width }));
 
 function macroRow(
   week: number,
@@ -60,7 +60,8 @@ function macroRow(
   ];
 }
 
-function weekRows(weekStart: Date, weekLogs: LogEntry[], items: Item[]): Row[] {
+/** The week's item rows, then its bold total row carrying the week's note. */
+function weekRows(weekStart: Date, weekLogs: LogEntry[], items: Item[], note: string): Row[] {
   const { week } = getISOWeek(weekStart);
   // Excel dates have no time zone and write-excel-file converts them as UTC,
   // so the local calendar date goes in as UTC midnight.
@@ -78,7 +79,10 @@ function weekRows(weekStart: Date, weekLogs: LogEntry[], items: Item[]): Row[] {
     macroRow(week, weekOf, item.name, portions.get(item.id)!, macros, false)
   );
   const totalPortions = weekItems.reduce((sum, { item }) => sum + portions.get(item.id)!, 0);
-  rows.push(macroRow(week, weekOf, "Total", totalPortions, sumMacros(items, portions), true));
+  rows.push([
+    ...macroRow(week, weekOf, "Total", totalPortions, sumMacros(items, portions), true),
+    note,
+  ]);
   return rows;
 }
 
@@ -88,9 +92,9 @@ function weekRows(weekStart: Date, weekLogs: LogEntry[], items: Item[]): Row[] {
  * down by day.
  */
 export async function downloadExcelExport(store: DataStore) {
-  const [{ default: writeExcelFile }, [items, logs]] = await Promise.all([
+  const [{ default: writeExcelFile }, [items, logs, notes]] = await Promise.all([
     import("write-excel-file/browser"),
-    Promise.all([store.listItems(), store.listLogs()]),
+    Promise.all([store.listItems(), store.listLogs(), store.listWeekNotes()]),
   ]);
 
   const logsByWeek = new Map<number, LogEntry[]>();
@@ -106,7 +110,9 @@ export async function downloadExcelExport(store: DataStore) {
     const weekStart = new Date(key);
     const { year } = getISOWeek(weekStart);
     const rows = rowsByYear.get(year) ?? [];
-    rows.push(...weekRows(weekStart, logsByWeek.get(key)!, items));
+    rows.push(
+      ...weekRows(weekStart, logsByWeek.get(key)!, items, notes[localDateKey(weekStart)] ?? "")
+    );
     rowsByYear.set(year, rows);
   }
   if (rowsByYear.size === 0) rowsByYear.set(getISOWeek(new Date()).year, []);
@@ -120,5 +126,5 @@ export async function downloadExcelExport(store: DataStore) {
   }));
 
   const now = new Date();
-  saveFile(await writeExcelFile(sheets).toBlob(), `weekly-export-${localDateStamp(now)}.xlsx`);
+  saveFile(await writeExcelFile(sheets).toBlob(), `weekly-export-${localDateKey(now)}.xlsx`);
 }

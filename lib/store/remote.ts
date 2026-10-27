@@ -113,4 +113,29 @@ export const remoteStore: DataStore = {
     if (error || !data) throw error ?? new Error("Could not save goals.");
     return goalsFromRow(data);
   },
+  async listWeekNotes() {
+    const supabase = createClient();
+    const { data, error } = await supabase.from("week_notes").select("week_start, note");
+    if (error) throw error;
+    return Object.fromEntries((data ?? []).map((row) => [row.week_start, row.note]));
+  },
+  async saveWeekNote(weekKey: string, note: string) {
+    const supabase = createClient();
+    if (note.trim() === "") {
+      const { error } = await supabase.from("week_notes").delete().eq("week_start", weekKey);
+      if (error) throw error;
+      return;
+    }
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not signed in.");
+    const { error } = await supabase.from("week_notes").upsert({
+      user_id: session.user.id,
+      week_start: weekKey,
+      note,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+  },
 };

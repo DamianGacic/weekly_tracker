@@ -1,10 +1,21 @@
-import type { DataStore, Goals, Item, LogEntry, ItemInput } from "@/lib/store/types";
+import type { DataStore, Goals, Item, LogEntry, ItemInput, WeekNotes } from "@/lib/store/types";
 import { caloriesFor } from "@/lib/macros";
 import { NO_GOALS } from "@/lib/goals";
 
 const ITEMS_KEY = "weekly:items";
 const LOGS_KEY = "weekly:logs";
 const GOALS_KEY = "weekly:goals";
+const NOTES_KEY = "weekly:notes";
+
+function readNotes(): WeekNotes {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(NOTES_KEY);
+    return raw ? (JSON.parse(raw) as WeekNotes) : {};
+  } catch {
+    return {};
+  }
+}
 
 function read<T>(key: string): T[] {
   if (typeof window === "undefined") return [];
@@ -30,6 +41,11 @@ export function clearLocalData() {
 export function clearLocalGoals() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(GOALS_KEY);
+}
+
+export function clearLocalNotes() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(NOTES_KEY);
 }
 
 export const localStore: DataStore = {
@@ -92,5 +108,15 @@ export const localStore: DataStore = {
       window.localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
     }
     return goals;
+  },
+  async listWeekNotes() {
+    return readNotes();
+  },
+  async saveWeekNote(weekKey: string, note: string) {
+    if (typeof window === "undefined") return;
+    const notes = readNotes();
+    if (note.trim() === "") delete notes[weekKey];
+    else notes[weekKey] = note;
+    window.localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
   },
 };

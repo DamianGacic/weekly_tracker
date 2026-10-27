@@ -105,6 +105,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      week_notes: {
+        Row: {
+          user_id: string;
+          week_start: string;
+          note: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id?: string;
+          week_start: string;
+          note: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          week_start?: string;
+          note?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

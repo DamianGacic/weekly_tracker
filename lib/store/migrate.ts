@@ -1,6 +1,25 @@
 import { createClient } from "@/lib/supabase/client";
-import { localStore, clearLocalData, clearLocalGoals } from "@/lib/store/local";
+import { localStore, clearLocalData, clearLocalGoals, clearLocalNotes } from "@/lib/store/local";
 import { remoteStore } from "@/lib/store/remote";
+
+/**
+ * Week notes written while signed out are uploaded for weeks the account has
+ * no note for yet; a week that already has one keeps it.
+ */
+async function migrateLocalNotesToRemote(): Promise<void> {
+  const localNotes = await localStore.listWeekNotes();
+  if (Object.keys(localNotes).length === 0) return;
+
+  try {
+    const remoteNotes = await remoteStore.listWeekNotes();
+    for (const [weekKey, note] of Object.entries(localNotes)) {
+      if (!(weekKey in remoteNotes)) await remoteStore.saveWeekNote(weekKey, note);
+    }
+    clearLocalNotes();
+  } catch (err) {
+    console.error("Failed to migrate week notes to Supabase:", err);
+  }
+}
 
 /**
  * Goals set while signed out are uploaded only if the account has no goals
@@ -30,6 +49,7 @@ async function migrateLocalGoalsToRemote(): Promise<void> {
  */
 export async function migrateLocalDataToRemote(): Promise<void> {
   await migrateLocalGoalsToRemote();
+  await migrateLocalNotesToRemote();
 
   const supabase = createClient();
 

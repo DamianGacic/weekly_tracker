@@ -67,6 +67,12 @@ export function getISOWeek(date: Date): { year: number; week: number } {
   return { year: isoYear, week };
 }
 
+/** Local calendar date as "YYYY-MM-DD". A week's key is its Monday's date. */
+export function localDateKey(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export function formatWeekLabel(weekStart: Date): string {
   const { year, week } = getISOWeek(weekStart);
   return `${year}, week ${week}`;

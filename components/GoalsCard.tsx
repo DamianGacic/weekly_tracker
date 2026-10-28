@@ -2,15 +2,19 @@
 
 import { useState, type FormEvent } from "react";
 import { Pencil } from "lucide-react";
-import type { Goal, GoalStepMode, Goals } from "@/lib/store/types";
+import type { Goal, Goals } from "@/lib/store/types";
 import { goalForWeek } from "@/lib/goals";
 import { round1 } from "@/lib/macros";
-import { parseDecimal } from "@/lib/number";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  GoalFields,
+  draftFor,
+  formatStep,
+  goalFromDraft,
+  sameDraft,
+  type GoalDraft,
+} from "@/components/GoalFields";
 import {
   Dialog,
   DialogContent,
@@ -116,58 +120,6 @@ function GoalSummary({
   );
 }
 
-function formatStep(goal: Goal, unit: string): string {
-  const sign = goal.step > 0 ? "+" : "−";
-  const amount = round1(Math.abs(goal.step));
-  return `${sign}${amount}${goal.stepMode === "percent" ? "%" : unit}/week`;
-}
-
-type Direction = "same" | "increase" | "decrease";
-
-type GoalDraft = { value: string; direction: Direction; amount: string; mode: GoalStepMode };
-
-function draftFor(goal: Goal | null, weekStart: Date): GoalDraft {
-  if (!goal) return { value: "", direction: "same", amount: "", mode: "flat" };
-  return {
-    value: String(round1(goalForWeek(goal, weekStart))),
-    direction: goal.step > 0 ? "increase" : goal.step < 0 ? "decrease" : "same",
-    amount: goal.step === 0 ? "" : String(Math.abs(goal.step)),
-    mode: goal.stepMode,
-  };
-}
-
-function sameDraft(a: GoalDraft, b: GoalDraft): boolean {
-  return (
-    a.value.trim() === b.value.trim() &&
-    a.direction === b.direction &&
-    a.amount.trim() === b.amount.trim() &&
-    a.mode === b.mode
-  );
-}
-
-/**
- * Turns a draft back into a goal anchored at `weekStart` — this week's value
- * becomes the new base that later weekly changes build on. Throws a
- * user-facing message for invalid input.
- */
-function goalFromDraft(draft: GoalDraft, label: string, weekStart: Date): Goal | null {
-  if (draft.value.trim() === "") return null;
-  const value = parseDecimal(draft.value);
-  if (value < 0) throw new Error(`${label} can't be negative.`);
-
-  let step = 0;
-  if (draft.direction !== "same") {
-    const amount = parseDecimal(draft.amount);
-    if (amount <= 0) throw new Error(`Enter how much ${label.toLowerCase()} should change each week.`);
-    if (draft.mode === "percent" && draft.direction === "decrease" && amount >= 100) {
-      throw new Error(`A weekly ${label.toLowerCase()} decrease must be under 100%.`);
-    }
-    step = draft.direction === "increase" ? amount : -amount;
-  }
-
-  return { value, anchorWeek: weekStart.toISOString(), step, stepMode: draft.mode };
-}
-
 function GoalsForm({
   goals,
   weekStart,
@@ -222,7 +174,10 @@ function GoalsForm({
         {(Object.keys(GOAL_FIELDS) as GoalKey[]).map((key) => (
           <GoalFields
             key={key}
-            goalKey={key}
+            id={`goal-${key}`}
+            label={GOAL_FIELDS[key].label}
+            unit={GOAL_FIELDS[key].unit}
+            inputLabel={GOAL_FIELDS[key].inputLabel}
             draft={drafts[key]}
             weekStart={weekStart}
             onChange={(patch) => update(key, patch)}
@@ -236,127 +191,5 @@ function GoalsForm({
         </Button>
       </DialogFooter>
     </form>
-  );
-}
-
-function GoalFields({
-  goalKey,
-  draft,
-  weekStart,
-  onChange,
-}: {
-  goalKey: GoalKey;
-  draft: GoalDraft;
-  weekStart: Date;
-  onChange: (patch: Partial<GoalDraft>) => void;
-}) {
-  const { label, unit, inputLabel } = GOAL_FIELDS[goalKey];
-  const inputId = `goal-${goalKey}`;
-
-  let preview: Goal | null = null;
-  try {
-    preview = goalFromDraft(draft, label, weekStart);
-  } catch {
-    // Incomplete input — just skip the preview until it's valid.
-  }
-  const nextWeek = new Date(weekStart);
-  nextWeek.setDate(nextWeek.getDate() + 7);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={inputId}>{inputLabel}</Label>
-      <Input
-        id={inputId}
-        type="text"
-        inputMode="decimal"
-        placeholder="Not set"
-        value={draft.value}
-        onChange={(e) => onChange({ value: e.target.value })}
-      />
-      {preview && (
-        <p className="text-xs text-muted-foreground">
-          ≈ {round1(preview.value / 7)}
-          {unit}/day
-          {preview.step !== 0 && (
-            <>
-              {" "}
-              · next week {round1(goalForWeek(preview, nextWeek))}
-              {unit}
-            </>
-          )}
-        </p>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Every week:</span>
-        <Segmented
-          label={`${label} weekly change`}
-          value={draft.direction}
-          onChange={(direction) => onChange({ direction })}
-          options={[
-            { value: "same", label: "Keep" },
-            { value: "increase", label: "Increase" },
-            { value: "decrease", label: "Decrease" },
-          ]}
-        />
-      </div>
-      {draft.direction !== "same" && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">by</span>
-          <Input
-            type="text"
-            inputMode="decimal"
-            aria-label={`${label} weekly change amount`}
-            className="w-20"
-            value={draft.amount}
-            onChange={(e) => onChange({ amount: e.target.value })}
-          />
-          <Segmented
-            label={`${label} weekly change unit`}
-            value={draft.mode}
-            onChange={(mode) => onChange({ mode })}
-            options={[
-              { value: "flat", label: unit.trim() },
-              { value: "percent", label: "%" },
-            ]}
-          />
-          {draft.mode === "percent" && (
-            <span className="text-xs text-muted-foreground">of the previous week</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div role="group" aria-label={label} className="inline-flex rounded-lg bg-muted p-0.5">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={option.value === value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "rounded-md px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-            option.value === value
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
   );
 }

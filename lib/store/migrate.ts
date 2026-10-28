@@ -1,6 +1,45 @@
 import { createClient } from "@/lib/supabase/client";
-import { localStore, clearLocalData, clearLocalGoals, clearLocalNotes } from "@/lib/store/local";
+import {
+  localStore,
+  clearLocalData,
+  clearLocalGoals,
+  clearLocalMovements,
+  clearLocalNotes,
+} from "@/lib/store/local";
 import { remoteStore } from "@/lib/store/remote";
+
+/**
+ * Same one-time upload as items/logs below, for movements and their logs:
+ * only into an account with no movements yet, and local data is cleared only
+ * if every movement made it.
+ */
+async function migrateLocalMovementsToRemote(): Promise<void> {
+  const localMovements = await localStore.listMovements();
+  if (localMovements.length === 0) return;
+
+  try {
+    if ((await remoteStore.listMovements()).length > 0) return;
+    const localLogs = await localStore.listMovementLogs();
+
+    const idMap = new Map<string, string>();
+    for (const { id, name, kind, default_amount, goal } of localMovements) {
+      const created = await remoteStore.createMovement({ name, kind, default_amount, goal });
+      idMap.set(id, created.id);
+    }
+
+    const logsToInsert = localLogs.flatMap((log) => {
+      const movementId = idMap.get(log.movement_id);
+      return movementId ? [{ movement_id: movementId, amount: log.amount, logged_at: log.logged_at }] : [];
+    });
+    if (logsToInsert.length > 0) {
+      const { error } = await createClient().from("movement_logs").insert(logsToInsert);
+      if (error) throw error;
+    }
+    clearLocalMovements();
+  } catch (err) {
+    console.error("Failed to migrate movements to Supabase:", err);
+  }
+}
 
 /**
  * Week notes written while signed out are uploaded for weeks the account has
@@ -50,6 +89,7 @@ async function migrateLocalGoalsToRemote(): Promise<void> {
 export async function migrateLocalDataToRemote(): Promise<void> {
   await migrateLocalGoalsToRemote();
   await migrateLocalNotesToRemote();
+  await migrateLocalMovementsToRemote();
 
   const supabase = createClient();
 

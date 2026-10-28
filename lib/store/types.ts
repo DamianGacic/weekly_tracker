@@ -45,6 +45,30 @@ export type Goals = {
   calories: Goal | null;
 };
 
+/** "reps": a move, counted in repetitions. "time": a position, held for a number of seconds. */
+export type MovementKind = "reps" | "time";
+
+export type Movement = {
+  id: string;
+  name: string;
+  kind: MovementKind;
+  /** What one tap logs: reps, or seconds for a position. */
+  default_amount: number;
+  /** Optional weekly target, in the same units as the movement's logs. */
+  goal: Goal | null;
+  created_at: string;
+};
+
+export type MovementInput = Omit<Movement, "id" | "created_at">;
+
+export type MovementLog = {
+  id: string;
+  movement_id: string;
+  /** Reps, or seconds for a position. */
+  amount: number;
+  logged_at: string;
+};
+
 /** Each week's note, keyed by that week's Monday as "YYYY-MM-DD" (see `localDateKey`). */
 export type WeekNotes = Record<string, string>;
 
@@ -64,4 +88,11 @@ export interface DataStore {
   listWeekNotes(): Promise<WeekNotes>;
   /** Saves the note for the week keyed `weekKey`; a blank note removes it. */
   saveWeekNote(weekKey: string, note: string): Promise<void>;
+  listMovements(): Promise<Movement[]>;
+  createMovement(input: MovementInput): Promise<Movement>;
+  updateMovement(movementId: string, input: MovementInput): Promise<Movement>;
+  listMovementLogs(): Promise<MovementLog[]>;
+  /** `loggedAt` defaults to now; pass it explicitly to log into a past week. */
+  logMovement(movementId: string, amount: number, loggedAt?: string): Promise<MovementLog>;
+  deleteMovementLog(logId: string): Promise<void>;
 }

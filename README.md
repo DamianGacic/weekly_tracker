@@ -30,10 +30,11 @@ away, no Supabase project required. Data lives in `localStorage` until you sign 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Open the SQL editor and run [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql),
    then [`supabase/migrations/0002_goals.sql`](supabase/migrations/0002_goals.sql),
-   [`supabase/migrations/0003_log_amounts.sql`](supabase/migrations/0003_log_amounts.sql) and
-   [`supabase/migrations/0004_week_notes.sql`](supabase/migrations/0004_week_notes.sql).
-   These create the `items`/`logs`/`goals`/`week_notes` tables and their Row Level Security
-   policies.
+   [`supabase/migrations/0003_log_amounts.sql`](supabase/migrations/0003_log_amounts.sql),
+   [`supabase/migrations/0004_week_notes.sql`](supabase/migrations/0004_week_notes.sql) and
+   [`supabase/migrations/0005_movements.sql`](supabase/migrations/0005_movements.sql).
+   These create the `items`/`logs`/`goals`/`week_notes`/`movements`/`movement_logs` tables and
+   their Row Level Security policies.
 3. Under **Authentication → Sign In / Providers**, confirm Email is enabled (it is by default; no
    password is required — this app uses magic links).
 4. Under **Authentication → URL Configuration**, set:

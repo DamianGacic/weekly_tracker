@@ -47,3 +47,6 @@ export function proteinStatus(consumed: number, weeklyGoal: number, progress: nu
   if (consumed > 0 && consumed >= weeklyGoal) return "green";
   return consumed < weeklyGoal * progress * 0.75 ? "red" : "yellow";
 }
+
+/** Movement goals are targets too, judged the same way as protein. */
+export const movementStatus = proteinStatus;

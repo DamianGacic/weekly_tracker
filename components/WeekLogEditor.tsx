@@ -6,6 +6,7 @@ import type { DataStore, Item, ItemInput, LogEntry } from "@/lib/store/types";
 import { macrosFor, portionsByItem } from "@/lib/macros";
 import { formatAmount } from "@/lib/number";
 import { nextTempId } from "@/lib/tempId";
+import { useLaggedSnapshot } from "@/lib/useLaggedSnapshot";
 import { FOOD_CATALOG } from "@/lib/foodCatalog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,23 +58,8 @@ export function WeekLogEditor({
     [items, portions]
   );
 
-  // Sort key (the item's calories this week) that lags behind by
-  // RESORT_DELAY_MS, so an item doesn't jump position right after being
-  // clicked and cause a misclick on the next tap. Falls back to the live
-  // value for anything not in the snapshot yet (a brand-new item just
-  // logged for the first time this week), so newly-appearing rows still
-  // show up immediately -- only *existing* rows' order is held stable.
-  const [sortSnapshot, setSortSnapshot] = useState<Map<string, number>>(() => new Map());
-  const resortTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    clearTimeout(resortTimer.current);
-    resortTimer.current = setTimeout(
-      () => setSortSnapshot(new Map(caloriesByItem)),
-      RESORT_DELAY_MS
-    );
-    return () => clearTimeout(resortTimer.current);
-  }, [caloriesByItem]);
+  // Sort key: the item's calories this week, lagging behind by RESORT_DELAY_MS.
+  const sortSnapshot = useLaggedSnapshot(caloriesByItem, RESORT_DELAY_MS);
 
   const loggedItems = items
     .filter((item) => (portions.get(item.id) ?? 0) > 0)
@@ -253,7 +239,7 @@ export function WeekLogEditor({
   );
 }
 
-const ROUND_BUTTON =
+export const ROUND_BUTTON =
   "flex size-5 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-60";
 
 function ItemRow({

@@ -1,4 +1,14 @@
-import type { DataStore, Goals, Item, LogEntry, ItemInput, WeekNotes } from "@/lib/store/types";
+import type {
+  DataStore,
+  Goals,
+  Item,
+  LogEntry,
+  ItemInput,
+  Movement,
+  MovementInput,
+  MovementLog,
+  WeekNotes,
+} from "@/lib/store/types";
 import { caloriesFor } from "@/lib/macros";
 import { NO_GOALS } from "@/lib/goals";
 
@@ -6,6 +16,8 @@ const ITEMS_KEY = "weekly:items";
 const LOGS_KEY = "weekly:logs";
 const GOALS_KEY = "weekly:goals";
 const NOTES_KEY = "weekly:notes";
+const MOVEMENTS_KEY = "weekly:movements";
+const MOVEMENT_LOGS_KEY = "weekly:movement-logs";
 
 function readNotes(): WeekNotes {
   if (typeof window === "undefined") return {};
@@ -46,6 +58,12 @@ export function clearLocalGoals() {
 export function clearLocalNotes() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(NOTES_KEY);
+}
+
+export function clearLocalMovements() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(MOVEMENTS_KEY);
+  window.localStorage.removeItem(MOVEMENT_LOGS_KEY);
 }
 
 export const localStore: DataStore = {
@@ -118,5 +136,45 @@ export const localStore: DataStore = {
     if (note.trim() === "") delete notes[weekKey];
     else notes[weekKey] = note;
     window.localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+  },
+  async listMovements() {
+    return read<Movement>(MOVEMENTS_KEY).sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async createMovement(input: MovementInput) {
+    const movement: Movement = {
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      ...input,
+    };
+    write(MOVEMENTS_KEY, [...read<Movement>(MOVEMENTS_KEY), movement]);
+    return movement;
+  },
+  async updateMovement(movementId: string, input: MovementInput) {
+    const movements = read<Movement>(MOVEMENTS_KEY);
+    const index = movements.findIndex((movement) => movement.id === movementId);
+    if (index === -1) throw new Error("Move not found.");
+    const updated: Movement = { ...movements[index], ...input };
+    movements[index] = updated;
+    write(MOVEMENTS_KEY, movements);
+    return updated;
+  },
+  async listMovementLogs() {
+    return read<MovementLog>(MOVEMENT_LOGS_KEY);
+  },
+  async logMovement(movementId: string, amount: number, loggedAt?: string) {
+    const log: MovementLog = {
+      id: crypto.randomUUID(),
+      movement_id: movementId,
+      amount,
+      logged_at: loggedAt ?? new Date().toISOString(),
+    };
+    write(MOVEMENT_LOGS_KEY, [...read<MovementLog>(MOVEMENT_LOGS_KEY), log]);
+    return log;
+  },
+  async deleteMovementLog(logId: string) {
+    write(
+      MOVEMENT_LOGS_KEY,
+      read<MovementLog>(MOVEMENT_LOGS_KEY).filter((log) => log.id !== logId)
+    );
   },
 };

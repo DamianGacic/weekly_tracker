@@ -105,6 +105,77 @@ export type Database = {
         };
         Relationships: [];
       };
+      movements: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          kind: "reps" | "time";
+          default_amount: number;
+          goal_value: number | null;
+          goal_anchor_week: string | null;
+          goal_step: number;
+          goal_step_mode: "flat" | "percent";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          kind: "reps" | "time";
+          default_amount: number;
+          goal_value?: number | null;
+          goal_anchor_week?: string | null;
+          goal_step?: number;
+          goal_step_mode?: "flat" | "percent";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          kind?: "reps" | "time";
+          default_amount?: number;
+          goal_value?: number | null;
+          goal_anchor_week?: string | null;
+          goal_step?: number;
+          goal_step_mode?: "flat" | "percent";
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      movement_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          movement_id: string;
+          amount: number;
+          logged_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          movement_id: string;
+          amount: number;
+          logged_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          movement_id?: string;
+          amount?: number;
+          logged_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "movement_logs_movement_id_fkey";
+            columns: ["movement_id"];
+            isOneToOne: false;
+            referencedRelation: "movements";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       week_notes: {
         Row: {
           user_id: string;

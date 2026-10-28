@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Movement, MovementKind, MovementLog } from "@/lib/store/types";
 import { useMovementData } from "@/lib/store/useMovementData";
 import { avgDaily, formatWeekLabel, formatWeekRange, getWeekStart } from "@/lib/week";
-import { formatDuration, formatMovementAmount, totalsByMovement } from "@/lib/movement";
+import { KINDS, formatDuration, formatMovementAmount, totalsByMovement } from "@/lib/movement";
 import { round1 } from "@/lib/macros";
 import { formatAmount } from "@/lib/number";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +13,6 @@ import { MovementLogEditor } from "@/components/MovementLogEditor";
 import { MovementStat } from "@/components/MovementDashboardClient";
 
 type WeekGroup = { weekStart: Date; weekLogs: MovementLog[] };
-
-const KINDS: MovementKind[] = ["reps", "time"];
 
 export function MovementHistoryClient() {
   const { store, movements, logs, setLogs, loading, error } = useMovementData();

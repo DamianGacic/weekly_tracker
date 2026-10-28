@@ -1,6 +1,9 @@
 import type { MovementKind, MovementLog } from "@/lib/store/types";
 import { formatAmount } from "@/lib/number";
 
+/** Display order wherever moves and positions are listed separately. */
+export const KINDS: MovementKind[] = ["reps", "time"];
+
 export const KIND_LABELS: Record<MovementKind, { one: string; many: string }> = {
   reps: { one: "Move", many: "Moves" },
   time: { one: "Position", many: "Positions" },

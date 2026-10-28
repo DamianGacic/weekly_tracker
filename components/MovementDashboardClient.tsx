@@ -4,9 +4,17 @@ import Link from "next/link";
 import { useMemo } from "react";
 import type { MovementKind } from "@/lib/store/types";
 import { useMovementData } from "@/lib/store/useMovementData";
+import { useMovementLogger } from "@/lib/store/useMovementLogger";
 import { avgDaily, formatWeekLabel, getWeekStart, weekProgress } from "@/lib/week";
 import { goalForWeek, movementStatus } from "@/lib/goals";
-import { GOAL_UNITS, formatDuration, totalsByMovement } from "@/lib/movement";
+import {
+  KINDS,
+  GOAL_UNITS,
+  KIND_LABELS,
+  formatDuration,
+  formatMovementAmount,
+  totalsByMovement,
+} from "@/lib/movement";
 import { round1 } from "@/lib/macros";
 import { formatAmount } from "@/lib/number";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +42,13 @@ export function MovementDashboardClient() {
   const seconds = totalFor("time");
   const avg = (total: number) => avgDaily(total, { weekStart, now, isCurrentWeek: true });
   const withGoals = movements.filter((movement) => movement.goal);
+  const { pendingId, logMovement } = useMovementLogger({
+    store,
+    weekLogs,
+    weekStart,
+    isCurrentWeek: true,
+    onLogsChange: setLogs,
+  });
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -49,21 +64,45 @@ export function MovementDashboardClient() {
           <CardTitle>This week</CardTitle>
           <p className="text-xs text-muted-foreground">{formatWeekLabel(weekStart)}</p>
           <WeekProgressBar fraction={progress} />
-          {withGoals.map((movement) => {
-            const { unit, scale } = GOAL_UNITS[movement.kind];
-            const target = goalForWeek(movement.goal!, weekStart);
-            const done = totals.get(movement.id) ?? 0;
+          {KINDS.map((kind) => {
+            const goals = withGoals.filter((movement) => movement.kind === kind);
+            if (goals.length === 0) return null;
             return (
-              <GoalBar
-                key={movement.id}
-                label={movement.name}
-                emptyLabel="No goal set"
-                consumed={done / scale}
-                target={target / scale}
-                unit={unit}
-                progress={progress}
-                status={movementStatus(done, target, progress)}
-              />
+              <div key={kind} className="mt-3 flex flex-col">
+                <span className="text-xs font-medium">{KIND_LABELS[kind].many}</span>
+                {goals.map((movement) => {
+                  const { unit, scale } = GOAL_UNITS[movement.kind];
+                  const target = goalForWeek(movement.goal!, weekStart);
+                  const done = totals.get(movement.id) ?? 0;
+                  const perTap = formatMovementAmount(movement.kind, movement.default_amount);
+                  return (
+                    // Tapping a goal logs one tap's worth, same as its row in the list below.
+                    <div
+                      key={movement.id}
+                      className="relative -mx-2 rounded-md px-2 pb-1.5 hover:bg-accent has-disabled:opacity-60"
+                    >
+                      <GoalBar
+                        label={movement.name}
+                        hint={`+${perTap}`}
+                        emptyLabel="No goal set"
+                        consumed={done / scale}
+                        target={target / scale}
+                        unit={unit}
+                        progress={progress}
+                        status={movementStatus(done, target, progress)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => logMovement(movement.id, movement.default_amount)}
+                        disabled={pendingId === movement.id}
+                        aria-label={`Log ${perTap} of ${movement.name}`}
+                        title={`Log ${perTap}`}
+                        className="absolute inset-0 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             );
           })}
         </CardHeader>

@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Hash, Minus, Timer } from "lucide-react";
-import type { DataStore, Movement, MovementKind, MovementLog } from "@/lib/store/types";
-import { KIND_LABELS, formatMovementAmount, totalsByMovement } from "@/lib/movement";
-import { nextTempId } from "@/lib/tempId";
+import type { DataStore, Movement, MovementLog } from "@/lib/store/types";
+import { KINDS, KIND_LABELS, formatMovementAmount, totalsByMovement } from "@/lib/movement";
 import { useLaggedSnapshot } from "@/lib/useLaggedSnapshot";
+import { useMovementLogger } from "@/lib/store/useMovementLogger";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,8 +15,6 @@ import { ROUND_BUTTON } from "@/components/WeekLogEditor";
 
 // Same grace period as the macro list before rows re-sort after a tap.
 const RESORT_DELAY_MS = 4000;
-
-const KINDS: MovementKind[] = ["reps", "time"];
 
 export function MovementLogEditor({
   movements,
@@ -41,7 +39,13 @@ export function MovementLogEditor({
   actions?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const { pendingId, logMovement, unlogMovement } = useMovementLogger({
+    store,
+    weekLogs,
+    weekStart,
+    isCurrentWeek,
+    onLogsChange,
+  });
   const [customMovement, setCustomMovement] = useState<Movement | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,48 +81,6 @@ export function MovementLogEditor({
     trimmedQuery.length === 0
       ? []
       : movements.filter((movement) => movement.name.toLowerCase().includes(trimmedQuery)).slice(0, 8);
-
-  async function logMovement(movementId: string, amount: number) {
-    setPendingId(movementId);
-    const tempId = nextTempId();
-    // Current week: log at the real time. Past week: any time inside that
-    // week works, since only which week a log falls into is ever shown.
-    const loggedAt = isCurrentWeek
-      ? new Date()
-      : new Date(weekStart.getTime() + 12 * 60 * 60 * 1000);
-    const optimisticLog: MovementLog = {
-      id: tempId,
-      movement_id: movementId,
-      amount,
-      logged_at: loggedAt.toISOString(),
-    };
-    onLogsChange((prev) => [...prev, optimisticLog]);
-
-    try {
-      const log = await store.logMovement(movementId, amount, loggedAt.toISOString());
-      onLogsChange((prev) => prev.map((l) => (l.id === tempId ? log : l)));
-    } catch {
-      onLogsChange((prev) => prev.filter((l) => l.id !== tempId));
-    }
-    setPendingId(null);
-  }
-
-  async function unlogMovement(movementId: string) {
-    const mostRecent = weekLogs
-      .filter((log) => log.movement_id === movementId)
-      .sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime())[0];
-    if (!mostRecent) return;
-
-    setPendingId(movementId);
-    onLogsChange((prev) => prev.filter((l) => l.id !== mostRecent.id));
-
-    try {
-      await store.deleteMovementLog(mostRecent.id);
-    } catch {
-      onLogsChange((prev) => [...prev, mostRecent]);
-    }
-    setPendingId(null);
-  }
 
   function openCustom(movement: Movement) {
     setCustomMovement(movement);

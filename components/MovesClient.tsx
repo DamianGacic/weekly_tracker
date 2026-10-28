@@ -1,18 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import type { Movement, MovementKind } from "@/lib/store/types";
+import type { Movement } from "@/lib/store/types";
 import { useMovementData } from "@/lib/store/useMovementData";
 import { goalForWeek } from "@/lib/goals";
-import { GOAL_UNITS, KIND_LABELS, formatMovementAmount } from "@/lib/movement";
+import { KINDS, GOAL_UNITS, KIND_LABELS, formatMovementAmount } from "@/lib/movement";
 import { round1 } from "@/lib/macros";
 import { getWeekStart } from "@/lib/week";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { MovementDialog } from "@/components/MovementDialog";
 import { formatStep } from "@/components/GoalFields";
-
-const KINDS: MovementKind[] = ["reps", "time"];
 
 export function MovesClient() {
   const { movements, loading, error, createMovement, updateMovement } = useMovementData();

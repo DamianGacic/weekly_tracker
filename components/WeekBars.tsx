@@ -50,6 +50,7 @@ const STATUS_COLORS: Record<GoalStatus, string> = {
  */
 export function GoalBar({
   label,
+  hint,
   emptyLabel,
   consumed,
   target,
@@ -58,6 +59,8 @@ export function GoalBar({
   status,
 }: {
   label: string;
+  /** Shown in lighter text after the label, e.g. what tapping the bar logs. */
+  hint?: string;
   emptyLabel: string;
   consumed: number;
   target: number | null;
@@ -71,7 +74,10 @@ export function GoalBar({
   return (
     <div className="mt-2">
       <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
-        <span className="text-muted-foreground">{label}</span>
+        <span className="text-muted-foreground">
+          {label}
+          {hint && <span className="ml-1.5 text-muted-foreground/70">{hint}</span>}
+        </span>
         {target === null ? (
           <span className="text-muted-foreground">{emptyLabel}</span>
         ) : (

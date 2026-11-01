@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Item, ItemInput } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
-import { macrosFor } from "@/lib/macros";
+import { calorieShares, macrosFor } from "@/lib/macros";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -13,13 +13,21 @@ import { Segmented } from "@/components/GoalFields";
 
 type SortKey = "name" | "newest" | "calories" | "protein" | "carbs" | "fat";
 
+/**
+ * A macro's share of an item's calories (the split its pie shows), so the
+ * macro sorts rank by ratio rather than grams. Items with no macros sort last.
+ */
+function share(item: Item, macro: "protein" | "carbs" | "fat"): number {
+  return calorieShares(item.protein, item.carbs, item.fat)?.[macro] ?? -1;
+}
+
 const SORTS: { key: SortKey; label: string; compare: (a: Item, b: Item) => number }[] = [
   { key: "name", label: "Name (A–Z)", compare: (a, b) => a.name.localeCompare(b.name) },
   { key: "newest", label: "Newest first", compare: (a, b) => b.created_at.localeCompare(a.created_at) },
   { key: "calories", label: "Most calories", compare: (a, b) => b.calories - a.calories },
-  { key: "protein", label: "Most protein", compare: (a, b) => b.protein - a.protein },
-  { key: "carbs", label: "Most carbs", compare: (a, b) => b.carbs - a.carbs },
-  { key: "fat", label: "Most fat", compare: (a, b) => b.fat - a.fat },
+  { key: "protein", label: "Most protein %", compare: (a, b) => share(b, "protein") - share(a, "protein") },
+  { key: "carbs", label: "Most carbs %", compare: (a, b) => share(b, "carbs") - share(a, "carbs") },
+  { key: "fat", label: "Most fat %", compare: (a, b) => share(b, "fat") - share(a, "fat") },
 ];
 
 export function ItemsClient() {

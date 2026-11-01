@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { Item, LogEntry, WeekNotes } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
-import { getWeekStart, avgDaily, formatWeekRange, formatWeekLabel, localDateKey } from "@/lib/week";
+import {
+  getWeekStart,
+  avgDaily,
+  formatWeekRange,
+  formatWeekLabel,
+  localDateKey,
+  weeksBetween,
+} from "@/lib/week";
 import { portionsByItem, sumMacros, round1 } from "@/lib/macros";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TrackingGap } from "@/components/TrackingGap";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
 import { MacroSplitSummary } from "@/components/MacroSplit";
 import { WeekNote, WeekNoteView, withWeekNote } from "@/components/WeekNote";
@@ -73,8 +81,10 @@ export function HistoryClient() {
       {weekGroups.length === 0 ? (
         <p className="text-sm text-muted-foreground">No completed weeks yet.</p>
       ) : (
-        weekGroups.map(({ weekStart: ws, weekLogs }) => {
+        weekGroups.map(({ weekStart: ws, weekLogs }, i) => {
           const key = ws.getTime();
+          // Untracked weeks between this one and the next newer week shown (or this week).
+          const gapWeeks = weeksBetween(ws, i === 0 ? weekStart : weekGroups[i - 1].weekStart);
           const expanded = expandedKey === key;
           const portions = portionsByItem(weekLogs);
           const totals = sumMacros(items, portions);
@@ -82,63 +92,66 @@ export function HistoryClient() {
           const note = notes[weekKey] ?? "";
           const now = new Date();
           return (
-            <Card key={key}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base">{formatWeekRange(ws)}</CardTitle>
-                    <p className="text-xs text-muted-foreground">{formatWeekLabel(ws)}</p>
+            <Fragment key={key}>
+              {gapWeeks > 0 && <TrackingGap after={ws} weeks={gapWeeks} />}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-base">{formatWeekRange(ws)}</CardTitle>
+                      <p className="text-xs text-muted-foreground">{formatWeekLabel(ws)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setExpandedKey(expanded ? null : key)}
+                    >
+                      {expanded ? "Done" : "Edit"}
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setExpandedKey(expanded ? null : key)}
-                  >
-                    {expanded ? "Done" : "Edit"}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <WeekStat label="Protein" total={totals.protein} weekStart={ws} now={now} unit="g" />
-                <WeekStat label="Carbs" total={totals.carbs} weekStart={ws} now={now} unit="g" />
-                <WeekStat label="Fat" total={totals.fat} weekStart={ws} now={now} unit="g" />
-                <WeekStat
-                  label="Calories"
-                  total={totals.calories}
-                  weekStart={ws}
-                  now={now}
-                  unit=" kcal"
-                />
-              </CardContent>
-              <CardContent>
-                <MacroSplitSummary macros={totals} />
-              </CardContent>
-              {!expanded && note.trim() !== "" && (
-                <CardContent>
-                  <WeekNoteView note={note} />
-                </CardContent>
-              )}
-              {expanded && (
-                <CardContent className="flex flex-col gap-4">
-                  <WeekNote
-                    weekKey={weekKey}
-                    note={note}
-                    store={store}
-                    onSaved={(key, saved) => setNotes((prev) => withWeekNote(prev, key, saved))}
-                  />
-                  <WeekLogEditor
-                    items={items}
-                    weekLogs={weekLogs}
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <WeekStat label="Protein" total={totals.protein} weekStart={ws} now={now} unit="g" />
+                  <WeekStat label="Carbs" total={totals.carbs} weekStart={ws} now={now} unit="g" />
+                  <WeekStat label="Fat" total={totals.fat} weekStart={ws} now={now} unit="g" />
+                  <WeekStat
+                    label="Calories"
+                    total={totals.calories}
                     weekStart={ws}
-                    isCurrentWeek={false}
-                    store={store}
-                    onLogsChange={setLogs}
-                    onItemsChange={setItems}
-                    emptyLabel="Nothing logged that week."
+                    now={now}
+                    unit=" kcal"
                   />
                 </CardContent>
-              )}
-            </Card>
+                <CardContent>
+                  <MacroSplitSummary macros={totals} />
+                </CardContent>
+                {!expanded && note.trim() !== "" && (
+                  <CardContent>
+                    <WeekNoteView note={note} />
+                  </CardContent>
+                )}
+                {expanded && (
+                  <CardContent className="flex flex-col gap-4">
+                    <WeekNote
+                      weekKey={weekKey}
+                      note={note}
+                      store={store}
+                      onSaved={(key, saved) => setNotes((prev) => withWeekNote(prev, key, saved))}
+                    />
+                    <WeekLogEditor
+                      items={items}
+                      weekLogs={weekLogs}
+                      weekStart={ws}
+                      isCurrentWeek={false}
+                      store={store}
+                      onLogsChange={setLogs}
+                      onItemsChange={setItems}
+                      emptyLabel="Nothing logged that week."
+                    />
+                  </CardContent>
+                )}
+              </Card>
+            </Fragment>
           );
         })
       )}

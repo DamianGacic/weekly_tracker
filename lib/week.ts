@@ -45,6 +45,14 @@ export function isSameWeek(a: Date, b: Date): boolean {
   return getWeekStart(a).getTime() === getWeekStart(b).getTime();
 }
 
+/**
+ * Whole weeks strictly between two week starts, `older` before `newer`: 0
+ * for consecutive weeks. Rounded so a DST change can't knock it off by one.
+ */
+export function weeksBetween(older: Date, newer: Date): number {
+  return Math.round((newer.getTime() - older.getTime()) / (HOURS_PER_WEEK * MS_PER_HOUR)) - 1;
+}
+
 export function formatWeekRange(weekStart: Date): string {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);

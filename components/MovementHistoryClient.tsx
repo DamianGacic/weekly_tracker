@@ -1,14 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { Movement, MovementKind, MovementLog } from "@/lib/store/types";
 import { useMovementData } from "@/lib/store/useMovementData";
-import { avgDaily, formatWeekLabel, formatWeekRange, getWeekStart } from "@/lib/week";
+import {
+  avgDaily,
+  formatWeekLabel,
+  formatWeekRange,
+  getWeekStart,
+  weeksBetween,
+} from "@/lib/week";
 import { KINDS, formatDuration, formatMovementAmount, totalsByMovement } from "@/lib/movement";
 import { round1 } from "@/lib/macros";
 import { formatAmount } from "@/lib/number";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TrackingGap } from "@/components/TrackingGap";
 import { MovementLogEditor } from "@/components/MovementLogEditor";
 import { MovementStat } from "@/components/MovementDashboardClient";
 
@@ -48,8 +55,10 @@ export function MovementHistoryClient() {
       {weekGroups.length === 0 ? (
         <p className="text-sm text-muted-foreground">No completed weeks yet.</p>
       ) : (
-        weekGroups.map(({ weekStart: ws, weekLogs }) => {
+        weekGroups.map(({ weekStart: ws, weekLogs }, i) => {
           const key = ws.getTime();
+          // Untracked weeks between this one and the next newer week shown (or this week).
+          const gapWeeks = weeksBetween(ws, i === 0 ? currentWeekStart : weekGroups[i - 1].weekStart);
           const expanded = expandedKey === key;
           const totals = totalsByMovement(weekLogs);
           const now = new Date();
@@ -61,52 +70,55 @@ export function MovementHistoryClient() {
           const seconds = totalFor("time");
           const avg = (total: number) => avgDaily(total, { weekStart: ws, now, isCurrentWeek: false });
           return (
-            <Card key={key}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base">{formatWeekRange(ws)}</CardTitle>
-                    <p className="text-xs text-muted-foreground">{formatWeekLabel(ws)}</p>
+            <Fragment key={key}>
+              {gapWeeks > 0 && <TrackingGap after={ws} weeks={gapWeeks} />}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-base">{formatWeekRange(ws)}</CardTitle>
+                      <p className="text-xs text-muted-foreground">{formatWeekLabel(ws)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setExpandedKey(expanded ? null : key)}
+                    >
+                      {expanded ? "Done" : "Edit"}
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setExpandedKey(expanded ? null : key)}
-                  >
-                    {expanded ? "Done" : "Edit"}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <MovementStat
-                  label="Moves"
-                  value={`${formatAmount(reps)} reps`}
-                  avg={`${formatAmount(round1(avg(reps)))} reps/day avg`}
-                />
-                <MovementStat
-                  label="Positions"
-                  value={formatDuration(seconds)}
-                  avg={`${formatDuration(avg(seconds))}/day avg`}
-                />
-              </CardContent>
-              {expanded ? (
-                <CardContent>
-                  <MovementLogEditor
-                    movements={movements}
-                    weekLogs={weekLogs}
-                    weekStart={ws}
-                    isCurrentWeek={false}
-                    store={store}
-                    onLogsChange={setLogs}
-                    emptyLabel="Nothing logged that week."
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <MovementStat
+                    label="Moves"
+                    value={`${formatAmount(reps)} reps`}
+                    avg={`${formatAmount(round1(avg(reps)))} reps/day avg`}
+                  />
+                  <MovementStat
+                    label="Positions"
+                    value={formatDuration(seconds)}
+                    avg={`${formatDuration(avg(seconds))}/day avg`}
                   />
                 </CardContent>
-              ) : (
-                <CardContent>
-                  <WeekTotals movements={movements} totals={totals} />
-                </CardContent>
-              )}
-            </Card>
+                {expanded ? (
+                  <CardContent>
+                    <MovementLogEditor
+                      movements={movements}
+                      weekLogs={weekLogs}
+                      weekStart={ws}
+                      isCurrentWeek={false}
+                      store={store}
+                      onLogsChange={setLogs}
+                      emptyLabel="Nothing logged that week."
+                    />
+                  </CardContent>
+                ) : (
+                  <CardContent>
+                    <WeekTotals movements={movements} totals={totals} />
+                  </CardContent>
+                )}
+              </Card>
+            </Fragment>
           );
         })
       )}

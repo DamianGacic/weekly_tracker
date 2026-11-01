@@ -111,6 +111,7 @@ export async function migrateLocalDataToRemote(): Promise<void> {
         carbs: item.carbs,
         fat: item.fat,
         calories: item.calories,
+        staple: item.staple,
       })
       .select("id")
       .single();

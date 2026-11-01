@@ -153,6 +153,7 @@ export function DashboardClient() {
           onItemsChange={setItems}
           emptyLabel="Nothing logged yet — search above to add your first item."
           actions={<ItemDialog mode="create" onSave={handleCreateItem} />}
+          showStaples
         />
       </div>
     </div>

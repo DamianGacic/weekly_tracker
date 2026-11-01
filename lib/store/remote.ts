@@ -10,7 +10,7 @@ import type {
 } from "@/lib/store/types";
 import { NO_GOALS } from "@/lib/goals";
 
-const ITEM_COLUMNS = "id, name, protein, carbs, fat, calories, created_at";
+const ITEM_COLUMNS = "id, name, protein, carbs, fat, calories, staple, created_at";
 const LOG_COLUMNS = "id, item_id, consumed_at, amount";
 const GOAL_COLUMNS =
   "protein_value, protein_anchor_week, protein_step, protein_step_mode, calories_value, calories_anchor_week, calories_step, calories_step_mode";
@@ -93,6 +93,17 @@ export const remoteStore: DataStore = {
     const { data, error } = await supabase
       .from("items")
       .update(input)
+      .eq("id", itemId)
+      .select(ITEM_COLUMNS)
+      .single();
+    if (error || !data) throw error ?? new Error("Could not update item.");
+    return data;
+  },
+  async setItemStaple(itemId: string, staple: boolean) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("items")
+      .update({ staple })
       .eq("id", itemId)
       .select(ITEM_COLUMNS)
       .single();

@@ -5,6 +5,8 @@ export type Item = {
   carbs: number;
   fat: number;
   calories: number;
+  /** Offered in the Staples block on This week until it's logged that week. */
+  staple: boolean;
   created_at: string;
 };
 
@@ -77,6 +79,7 @@ export interface DataStore {
   listLogs(): Promise<LogEntry[]>;
   createItem(input: ItemInput): Promise<Item>;
   updateItem(itemId: string, input: ItemInput): Promise<Item>;
+  setItemStaple(itemId: string, staple: boolean): Promise<Item>;
   /**
    * `consumedAt` defaults to now; pass it explicitly to log into a past week.
    * `amount` is in portions and defaults to 1.

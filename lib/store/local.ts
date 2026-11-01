@@ -44,6 +44,16 @@ function write<T>(key: string, value: T[]) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function patchItem(itemId: string, patch: Partial<Omit<Item, "id" | "created_at">>): Item {
+  const items = read<Item>(ITEMS_KEY);
+  const index = items.findIndex((item) => item.id === itemId);
+  if (index === -1) throw new Error("Item not found.");
+  const updated: Item = { ...items[index], ...patch };
+  items[index] = updated;
+  write(ITEMS_KEY, items);
+  return updated;
+}
+
 export function clearLocalData() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(ITEMS_KEY);
@@ -68,10 +78,12 @@ export function clearLocalMovements() {
 
 export const localStore: DataStore = {
   async listItems() {
-    // Older locally-stored items predate the `calories` field — backfill from the 4/4/9 formula.
+    // Older locally-stored items predate the `calories` field — backfill from
+    // the 4/4/9 formula — and the `staple` flag.
     return read<Item>(ITEMS_KEY).map((item) => ({
       ...item,
       calories: item.calories ?? caloriesFor(item.protein, item.carbs, item.fat),
+      staple: item.staple ?? false,
     }));
   },
   async listLogs() {
@@ -82,19 +94,17 @@ export const localStore: DataStore = {
     const item: Item = {
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
+      staple: false,
       ...input,
     };
     write(ITEMS_KEY, [...read<Item>(ITEMS_KEY), item]);
     return item;
   },
   async updateItem(itemId: string, input: ItemInput) {
-    const items = read<Item>(ITEMS_KEY);
-    const index = items.findIndex((item) => item.id === itemId);
-    if (index === -1) throw new Error("Item not found.");
-    const updated: Item = { ...items[index], ...input };
-    items[index] = updated;
-    write(ITEMS_KEY, items);
-    return updated;
+    return patchItem(itemId, input);
+  },
+  async setItemStaple(itemId: string, staple: boolean) {
+    return patchItem(itemId, { staple });
   },
   async logItem(itemId: string, consumedAt?: string, amount = 1) {
     const log: LogEntry = {

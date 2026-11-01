@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Minus } from "lucide-react";
 import type { DataStore, Item, ItemInput, LogEntry } from "@/lib/store/types";
@@ -30,6 +31,7 @@ export function WeekLogEditor({
   onItemsChange,
   emptyLabel = "Nothing logged yet — search above to add an item.",
   actions,
+  showStaples = false,
 }: {
   items: Item[];
   /** Logs already filtered down to just this week. */
@@ -44,6 +46,8 @@ export function WeekLogEditor({
   emptyLabel?: string;
   /** Rendered next to the search input, e.g. a "New item" button. */
   actions?: ReactNode;
+  /** Show the Staples block: staple items not logged this week yet, one tap away. */
+  showStaples?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -68,6 +72,12 @@ export function WeekLogEditor({
       const bKey = sortSnapshot.get(b.id) ?? caloriesByItem.get(b.id) ?? 0;
       return bKey - aKey;
     });
+
+  // Once logged, a staple joins the list above instead.
+  const unloggedStaples = items
+    .filter((item) => item.staple && (portions.get(item.id) ?? 0) === 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const hasStaples = items.some((item) => item.staple);
 
   // Clicking outside the search input and its result lists clears the query.
   useEffect(() => {
@@ -225,6 +235,46 @@ export function WeekLogEditor({
                 />
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {showStaples && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Staples</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            {unloggedStaples.length === 0 ? (
+              <p className="px-2 text-sm text-muted-foreground">
+                {hasStaples ? (
+                  "All your staples are logged this week."
+                ) : (
+                  <>
+                    No staples yet — tick the ones you eat often in{" "}
+                    <Link href="/items" className="underline underline-offset-2">
+                      Your items
+                    </Link>
+                    .
+                  </>
+                )}
+              </p>
+            ) : (
+              unloggedStaples.map((item, i) => (
+                <div key={item.id}>
+                  {i > 0 && <Separator className="my-1" />}
+                  <ItemRow
+                    item={item}
+                    portions={0}
+                    showTotals={false}
+                    pending={pendingId === item.id}
+                    onAdd={() => logItem(item.id)}
+                    onSubtract={() => unlogItem(item.id)}
+                    onPartial={() => openPartial(item)}
+                  />
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       )}

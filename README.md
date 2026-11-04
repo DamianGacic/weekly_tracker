@@ -32,10 +32,11 @@ away, no Supabase project required. Data lives in `localStorage` until you sign 
    then [`supabase/migrations/0002_goals.sql`](supabase/migrations/0002_goals.sql),
    [`supabase/migrations/0003_log_amounts.sql`](supabase/migrations/0003_log_amounts.sql),
    [`supabase/migrations/0004_week_notes.sql`](supabase/migrations/0004_week_notes.sql),
-   [`supabase/migrations/0005_movements.sql`](supabase/migrations/0005_movements.sql) and
-   [`supabase/migrations/0006_item_staples.sql`](supabase/migrations/0006_item_staples.sql).
-   These create the `items`/`logs`/`goals`/`week_notes`/`movements`/`movement_logs` tables and
-   their Row Level Security policies.
+   [`supabase/migrations/0005_movements.sql`](supabase/migrations/0005_movements.sql),
+   [`supabase/migrations/0006_item_staples.sql`](supabase/migrations/0006_item_staples.sql) and
+   [`supabase/migrations/0007_raw_macros.sql`](supabase/migrations/0007_raw_macros.sql).
+   These create the `items`/`logs`/`raw_macros`/`goals`/`week_notes`/`movements`/`movement_logs`
+   tables and their Row Level Security policies.
 3. Under **Authentication → Sign In / Providers**, confirm Email is enabled (it is by default; no
    password is required — this app uses magic links).
 4. Under **Authentication → URL Configuration**, set:
@@ -66,6 +67,8 @@ actually restricts each signed-in user to their own rows.
 
 - Data model is an event log (`logs`, one row per click) rather than counters, so weekly totals
   are just a filter/sum over the full log list and any past week can be recomputed on demand.
+- Additional raw macros (`raw_macros`) add to a week without an item, for exceptions and rare
+  foods. Each entry counts toward its week's totals, goals, History and exports just like a log.
 - Local mode (`lib/store/local.ts`) and Supabase mode (`lib/store/remote.ts`) implement the same
   `DataStore` interface (`lib/store/types.ts`), so the UI components don't know or care which one
   is active — `lib/store/AuthProvider.tsx` picks based on sign-in state.

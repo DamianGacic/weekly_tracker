@@ -69,6 +69,36 @@ export type Database = {
           },
         ];
       };
+      raw_macros: {
+        Row: {
+          id: string;
+          user_id: string;
+          protein: number;
+          carbs: number;
+          fat: number;
+          calories: number;
+          consumed_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          protein: number;
+          carbs: number;
+          fat: number;
+          calories: number;
+          consumed_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          protein?: number;
+          carbs?: number;
+          fat?: number;
+          calories?: number;
+          consumed_at?: string;
+        };
+        Relationships: [];
+      };
       goals: {
         Row: {
           user_id: string;

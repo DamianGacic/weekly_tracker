@@ -7,11 +7,13 @@ import type {
   ItemInput,
   Movement,
   MovementInput,
+  RawMacroInput,
 } from "@/lib/store/types";
 import { NO_GOALS } from "@/lib/goals";
 
 const ITEM_COLUMNS = "id, name, protein, carbs, fat, calories, staple, created_at";
 const LOG_COLUMNS = "id, item_id, consumed_at, amount";
+const RAW_MACRO_COLUMNS = "id, protein, carbs, fat, calories, consumed_at";
 const GOAL_COLUMNS =
   "protein_value, protein_anchor_week, protein_step, protein_step_mode, calories_value, calories_anchor_week, calories_step, calories_step_mode";
 const MOVEMENT_COLUMNS =
@@ -127,6 +129,30 @@ export const remoteStore: DataStore = {
   async deleteLog(logId: string) {
     const supabase = createClient();
     const { error } = await supabase.from("logs").delete().eq("id", logId);
+    if (error) throw error;
+  },
+  async listRawMacros() {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("raw_macros")
+      .select(RAW_MACRO_COLUMNS)
+      .order("consumed_at");
+    if (error) throw error;
+    return data ?? [];
+  },
+  async addRawMacros(input: RawMacroInput, consumedAt?: string) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("raw_macros")
+      .insert({ ...input, consumed_at: consumedAt })
+      .select(RAW_MACRO_COLUMNS)
+      .single();
+    if (error || !data) throw error ?? new Error("Could not add raw macros.");
+    return data;
+  },
+  async deleteRawMacros(entryId: string) {
+    const supabase = createClient();
+    const { error } = await supabase.from("raw_macros").delete().eq("id", entryId);
     if (error) throw error;
   },
   async getGoals() {

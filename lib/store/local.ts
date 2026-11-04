@@ -7,6 +7,8 @@ import type {
   Movement,
   MovementInput,
   MovementLog,
+  RawMacroEntry,
+  RawMacroInput,
   WeekNotes,
 } from "@/lib/store/types";
 import { caloriesFor } from "@/lib/macros";
@@ -14,6 +16,7 @@ import { NO_GOALS } from "@/lib/goals";
 
 const ITEMS_KEY = "weekly:items";
 const LOGS_KEY = "weekly:logs";
+const RAW_MACROS_KEY = "weekly:raw-macros";
 const GOALS_KEY = "weekly:goals";
 const NOTES_KEY = "weekly:notes";
 const MOVEMENTS_KEY = "weekly:movements";
@@ -58,6 +61,11 @@ export function clearLocalData() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(ITEMS_KEY);
   window.localStorage.removeItem(LOGS_KEY);
+}
+
+export function clearLocalRawMacros() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(RAW_MACROS_KEY);
 }
 
 export function clearLocalGoals() {
@@ -120,6 +128,24 @@ export const localStore: DataStore = {
     write(
       LOGS_KEY,
       read<LogEntry>(LOGS_KEY).filter((log) => log.id !== logId)
+    );
+  },
+  async listRawMacros() {
+    return read<RawMacroEntry>(RAW_MACROS_KEY);
+  },
+  async addRawMacros(input: RawMacroInput, consumedAt?: string) {
+    const entry: RawMacroEntry = {
+      id: crypto.randomUUID(),
+      consumed_at: consumedAt ?? new Date().toISOString(),
+      ...input,
+    };
+    write(RAW_MACROS_KEY, [...read<RawMacroEntry>(RAW_MACROS_KEY), entry]);
+    return entry;
+  },
+  async deleteRawMacros(entryId: string) {
+    write(
+      RAW_MACROS_KEY,
+      read<RawMacroEntry>(RAW_MACROS_KEY).filter((entry) => entry.id !== entryId)
     );
   },
   async getGoals() {

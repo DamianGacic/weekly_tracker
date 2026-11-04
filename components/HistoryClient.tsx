@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import type { Item, LogEntry, WeekNotes } from "@/lib/store/types";
+import type { Item, LogEntry, RawMacroEntry, WeekNotes } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
 import {
   getWeekStart,
@@ -11,7 +11,7 @@ import {
   localDateKey,
   weeksBetween,
 } from "@/lib/week";
-import { portionsByItem, sumMacros, round1 } from "@/lib/macros";
+import { addMacros, portionsByItem, sumMacros, round1 } from "@/lib/macros";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrackingGap } from "@/components/TrackingGap";
@@ -19,7 +19,7 @@ import { WeekLogEditor } from "@/components/WeekLogEditor";
 import { MacroSplitSummary } from "@/components/MacroSplit";
 import { WeekNote, WeekNoteView, withWeekNote } from "@/components/WeekNote";
 
-type WeekGroup = { weekStart: Date; weekLogs: LogEntry[] };
+type WeekGroup = { weekStart: Date; weekLogs: LogEntry[]; weekRawMacros: RawMacroEntry[] };
 
 export function HistoryClient() {
   const { status, syncVersion } = useAuth();
@@ -27,6 +27,7 @@ export function HistoryClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [rawMacros, setRawMacros] = useState<RawMacroEntry[]>([]);
   const [notes, setNotes] = useState<WeekNotes>({});
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState<number | null>(null);
@@ -42,10 +43,16 @@ export function HistoryClient() {
         console.error("Could not load week notes:", err);
         return {};
       }),
-    ]).then(([loadedItems, loadedLogs, loadedNotes]) => {
+      // Same for raw macros.
+      store.listRawMacros().catch((err) => {
+        console.error("Could not load raw macros:", err);
+        return [];
+      }),
+    ]).then(([loadedItems, loadedLogs, loadedNotes, loadedRawMacros]) => {
       if (!active) return;
       setItems(loadedItems);
       setLogs(loadedLogs);
+      setRawMacros(loadedRawMacros);
       setNotes(loadedNotes);
       setLoading(false);
     });
@@ -57,19 +64,26 @@ export function HistoryClient() {
   const weekStart = useMemo(() => getWeekStart(new Date()), []);
 
   const weekGroups = useMemo(() => {
-    const groups = new Map<number, LogEntry[]>();
-    for (const log of logs) {
-      const logDate = new Date(log.consumed_at);
-      if (logDate >= weekStart) continue;
-      const key = getWeekStart(logDate).getTime();
-      const group = groups.get(key) ?? [];
-      group.push(log);
-      groups.set(key, group);
+    const groups = new Map<number, WeekGroup>();
+    // The group of the past week `consumedAt` falls in, or null if it's in this week.
+    function groupFor(consumedAt: string): WeekGroup | null {
+      const date = new Date(consumedAt);
+      if (date >= weekStart) return null;
+      const start = getWeekStart(date);
+      const group = groups.get(start.getTime()) ?? {
+        weekStart: start,
+        weekLogs: [],
+        weekRawMacros: [],
+      };
+      groups.set(start.getTime(), group);
+      return group;
     }
-    return Array.from(groups.entries())
-      .map(([key, weekLogs]): WeekGroup => ({ weekStart: new Date(key), weekLogs }))
-      .sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime());
-  }, [logs, weekStart]);
+    for (const log of logs) groupFor(log.consumed_at)?.weekLogs.push(log);
+    for (const entry of rawMacros) groupFor(entry.consumed_at)?.weekRawMacros.push(entry);
+    return Array.from(groups.values()).sort(
+      (a, b) => b.weekStart.getTime() - a.weekStart.getTime()
+    );
+  }, [logs, rawMacros, weekStart]);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -81,13 +95,13 @@ export function HistoryClient() {
       {weekGroups.length === 0 ? (
         <p className="text-sm text-muted-foreground">No completed weeks yet.</p>
       ) : (
-        weekGroups.map(({ weekStart: ws, weekLogs }, i) => {
+        weekGroups.map(({ weekStart: ws, weekLogs, weekRawMacros }, i) => {
           const key = ws.getTime();
           // Untracked weeks between this one and the next newer week shown (or this week).
           const gapWeeks = weeksBetween(ws, i === 0 ? weekStart : weekGroups[i - 1].weekStart);
           const expanded = expandedKey === key;
           const portions = portionsByItem(weekLogs);
-          const totals = sumMacros(items, portions);
+          const totals = addMacros(sumMacros(items, portions), weekRawMacros);
           const weekKey = localDateKey(ws);
           const note = notes[weekKey] ?? "";
           const now = new Date();
@@ -141,10 +155,12 @@ export function HistoryClient() {
                     <WeekLogEditor
                       items={items}
                       weekLogs={weekLogs}
+                      weekRawMacros={weekRawMacros}
                       weekStart={ws}
                       isCurrentWeek={false}
                       store={store}
                       onLogsChange={setLogs}
+                      onRawMacrosChange={setRawMacros}
                       onItemsChange={setItems}
                       emptyLabel="Nothing logged that week."
                     />

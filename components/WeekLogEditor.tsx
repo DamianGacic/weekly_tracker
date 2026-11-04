@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Minus } from "lucide-react";
-import type { DataStore, Item, ItemInput, LogEntry } from "@/lib/store/types";
+import type {
+  DataStore,
+  Item,
+  ItemInput,
+  LogEntry,
+  RawMacroEntry,
+  RawMacroInput,
+} from "@/lib/store/types";
 import { macrosFor, portionsByItem } from "@/lib/macros";
 import { formatAmount } from "@/lib/number";
 import { nextTempId } from "@/lib/tempId";
@@ -15,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MacroLine, MacroPie } from "@/components/MacroSplit";
 import { PortionDialog } from "@/components/PortionDialog";
+import { RawMacroDialog } from "@/components/RawMacroDialog";
 
 // Grace period before the "logged" list re-sorts by calories, so an item
 // doesn't jump position right after being clicked and cause a misclick on
@@ -24,10 +32,12 @@ const RESORT_DELAY_MS = 4000;
 export function WeekLogEditor({
   items,
   weekLogs,
+  weekRawMacros,
   weekStart,
   isCurrentWeek,
   store,
   onLogsChange,
+  onRawMacrosChange,
   onItemsChange,
   emptyLabel = "Nothing logged yet — search above to add an item.",
   actions,
@@ -36,11 +46,15 @@ export function WeekLogEditor({
   items: Item[];
   /** Logs already filtered down to just this week. */
   weekLogs: LogEntry[];
+  /** Additional raw macros already filtered down to just this week. */
+  weekRawMacros: RawMacroEntry[];
   weekStart: Date;
   isCurrentWeek: boolean;
   store: DataStore;
   /** Updates the full (all-weeks) log list the parent owns. */
   onLogsChange: (updater: (prev: LogEntry[]) => LogEntry[]) => void;
+  /** Updates the full (all-weeks) raw macro list the parent owns. */
+  onRawMacrosChange: (updater: (prev: RawMacroEntry[]) => RawMacroEntry[]) => void;
   /** Updates the item list the parent owns, needed when a catalog food gets imported. */
   onItemsChange: (updater: (prev: Item[]) => Item[]) => void;
   emptyLabel?: string;
@@ -107,15 +121,17 @@ export function WeekLogEditor({
             !items.some((item) => item.name.toLowerCase() === food.name.toLowerCase())
         ).slice(0, 8);
 
+  // Current week: log at the real time it happened. Past week: any
+  // timestamp inside that week works, since the app never shows a
+  // per-day breakdown -- only which week a log falls into matters.
+  function logTimestamp() {
+    return isCurrentWeek ? new Date() : new Date(weekStart.getTime() + 12 * 60 * 60 * 1000);
+  }
+
   async function logItem(itemId: string, amount = 1) {
     setPendingId(itemId);
     const tempId = nextTempId();
-    // Current week: log at the real time it happened. Past week: any
-    // timestamp inside that week works, since the app never shows a
-    // per-day breakdown -- only which week a log falls into matters.
-    const consumedAt = isCurrentWeek
-      ? new Date()
-      : new Date(weekStart.getTime() + 12 * 60 * 60 * 1000);
+    const consumedAt = logTimestamp();
     const optimisticLog: LogEntry = {
       id: tempId,
       item_id: itemId,
@@ -158,6 +174,21 @@ export function WeekLogEditor({
       await logItem(item.id);
     } finally {
       setPendingCatalogName(null);
+    }
+  }
+
+  // Not optimistic: the dialog stays open and shows the error if this throws.
+  async function addRawMacros(input: RawMacroInput) {
+    const entry = await store.addRawMacros(input, logTimestamp().toISOString());
+    onRawMacrosChange((prev) => [...prev, entry]);
+  }
+
+  async function removeRawMacros(entry: RawMacroEntry) {
+    onRawMacrosChange((prev) => prev.filter((e) => e.id !== entry.id));
+    try {
+      await store.deleteRawMacros(entry.id);
+    } catch {
+      onRawMacrosChange((prev) => [...prev, entry]);
     }
   }
 
@@ -216,8 +247,10 @@ export function WeekLogEditor({
         )}
       </div>
 
+      <RawMacrosCard entries={weekRawMacros} onAdd={addRawMacros} onRemove={removeRawMacros} />
+
       {loggedItems.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+        weekRawMacros.length === 0 && <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
         <Card>
           <CardContent className="flex flex-col gap-1">
@@ -291,6 +324,51 @@ export function WeekLogEditor({
 
 export const ROUND_BUTTON =
   "flex size-5 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-60";
+
+function RawMacrosCard({
+  entries,
+  onAdd,
+  onRemove,
+}: {
+  entries: RawMacroEntry[];
+  onAdd: (input: RawMacroInput) => Promise<void>;
+  onRemove: (entry: RawMacroEntry) => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">Additional raw macros</CardTitle>
+          <RawMacroDialog onAdd={onAdd} />
+        </div>
+      </CardHeader>
+      {entries.length > 0 && (
+        <CardContent className="flex flex-col gap-1">
+          {entries.map((entry, i) => (
+            <div key={entry.id}>
+              {i > 0 && <Separator className="my-1" />}
+              <div className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2">
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <MacroPie macros={entry} />
+                  <MacroLine macros={entry} />
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(entry)}
+                  aria-label="Remove these raw macros"
+                  title="Remove"
+                  className={ROUND_BUTTON}
+                >
+                  <Minus className="size-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
 
 function ItemRow({
   item,

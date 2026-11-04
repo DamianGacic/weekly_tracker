@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Item, LogEntry, ItemInput, Goals, WeekNotes } from "@/lib/store/types";
+import type { Item, LogEntry, ItemInput, Goals, RawMacroEntry, WeekNotes } from "@/lib/store/types";
 import { useAuth, storeFor } from "@/lib/store/AuthProvider";
 import { avgDaily, formatWeekLabel, getWeekStart, localDateKey, weekProgress } from "@/lib/week";
-import { portionsByItem, sumMacros, round1 } from "@/lib/macros";
+import { addMacros, portionsByItem, sumMacros, round1 } from "@/lib/macros";
 import { NO_GOALS, calorieStatus, goalForWeek, proteinStatus } from "@/lib/goals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GoalBar, WeekProgressBar } from "@/components/WeekBars";
@@ -20,6 +20,7 @@ export function DashboardClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [rawMacros, setRawMacros] = useState<RawMacroEntry[]>([]);
   const [goals, setGoals] = useState<Goals>(NO_GOALS);
   const [notes, setNotes] = useState<WeekNotes>({});
   const [loading, setLoading] = useState(true);
@@ -41,10 +42,16 @@ export function DashboardClient() {
         console.error("Could not load week notes:", err);
         return {};
       }),
-    ]).then(([loadedItems, loadedLogs, loadedGoals, loadedNotes]) => {
+      // Same for raw macros.
+      store.listRawMacros().catch((err) => {
+        console.error("Could not load raw macros:", err);
+        return [];
+      }),
+    ]).then(([loadedItems, loadedLogs, loadedGoals, loadedNotes, loadedRawMacros]) => {
       if (!active) return;
       setItems(loadedItems);
       setLogs(loadedLogs);
+      setRawMacros(loadedRawMacros);
       setGoals(loadedGoals);
       setNotes(loadedNotes);
       setLoading(false);
@@ -62,8 +69,15 @@ export function DashboardClient() {
     () => logs.filter((log) => new Date(log.consumed_at) >= weekStart),
     [logs, weekStart]
   );
+  const thisWeekRawMacros = useMemo(
+    () => rawMacros.filter((entry) => new Date(entry.consumed_at) >= weekStart),
+    [rawMacros, weekStart]
+  );
   const portions = useMemo(() => portionsByItem(thisWeekLogs), [thisWeekLogs]);
-  const totals = useMemo(() => sumMacros(items, portions), [items, portions]);
+  const totals = useMemo(
+    () => addMacros(sumMacros(items, portions), thisWeekRawMacros),
+    [items, portions, thisWeekRawMacros]
+  );
 
   const progress = weekProgress(weekStart, now);
 
@@ -146,10 +160,12 @@ export function DashboardClient() {
         <WeekLogEditor
           items={items}
           weekLogs={thisWeekLogs}
+          weekRawMacros={thisWeekRawMacros}
           weekStart={weekStart}
           isCurrentWeek
           store={store}
           onLogsChange={setLogs}
+          onRawMacrosChange={setRawMacros}
           onItemsChange={setItems}
           emptyLabel="Nothing logged yet — search above to add your first item."
           actions={<ItemDialog mode="create" onSave={handleCreateItem} />}

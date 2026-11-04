@@ -1,6 +1,14 @@
 import type { Cell, Row, Sheet } from "write-excel-file/browser";
-import type { DataStore, Item, LogEntry } from "@/lib/store/types";
-import { macrosFor, portionsByItem, round1, sumMacros, type MacroTotals } from "@/lib/macros";
+import type { DataStore, Item, LogEntry, RawMacroEntry } from "@/lib/store/types";
+import {
+  addMacros,
+  macrosFor,
+  portionsByItem,
+  round1,
+  sumMacros,
+  ZERO_MACROS,
+  type MacroTotals,
+} from "@/lib/macros";
 import { getISOWeek, getWeekStart, localDateKey } from "@/lib/week";
 
 function saveFile(blob: Blob, fileName: string) {
@@ -20,9 +28,10 @@ function saveFile(blob: Blob, fileName: string) {
 
 /** Downloads everything in `store` as JSON: the complete backup, every log with its timestamp. */
 export async function downloadJsonExport(store: DataStore, account: string | null) {
-  const [items, logs, goals, notes, movements, movementLogs] = await Promise.all([
+  const [items, logs, rawMacros, goals, notes, movements, movementLogs] = await Promise.all([
     store.listItems(),
     store.listLogs(),
+    store.listRawMacros(),
     store.getGoals(),
     store.listWeekNotes(),
     store.listMovements(),
@@ -30,7 +39,17 @@ export async function downloadJsonExport(store: DataStore, account: string | nul
   ]);
   const now = new Date();
   const json = JSON.stringify(
-    { exportedAt: now.toISOString(), account, items, logs, goals, notes, movements, movementLogs },
+    {
+      exportedAt: now.toISOString(),
+      account,
+      items,
+      logs,
+      rawMacros,
+      goals,
+      notes,
+      movements,
+      movementLogs,
+    },
     null,
     2
   );
@@ -44,7 +63,8 @@ function macroRow(
   week: number,
   weekOf: Date,
   label: string,
-  portions: number,
+  /** Null for a row that isn't made of portions: the additional raw macros. */
+  portions: number | null,
   macros: MacroTotals,
   bold: boolean
 ): Row {
@@ -54,7 +74,7 @@ function macroRow(
     cell(week),
     { value: weekOf, format: "yyyy-mm-dd", fontWeight },
     cell(label),
-    cell(Math.round(portions * 100) / 100),
+    portions === null ? null : cell(Math.round(portions * 100) / 100),
     cell(round1(macros.protein)),
     cell(round1(macros.carbs)),
     cell(round1(macros.fat)),
@@ -62,8 +82,14 @@ function macroRow(
   ];
 }
 
-/** The week's item rows, then its bold total row carrying the week's note. */
-function weekRows(weekStart: Date, weekLogs: LogEntry[], items: Item[], note: string): Row[] {
+/** The week's additional raw macros, its item rows, then its bold total row carrying the week's note. */
+function weekRows(
+  weekStart: Date,
+  weekLogs: LogEntry[],
+  weekRawMacros: RawMacroEntry[],
+  items: Item[],
+  note: string
+): Row[] {
   const { week } = getISOWeek(weekStart);
   // Excel dates have no time zone and write-excel-file converts them as UTC,
   // so the local calendar date goes in as UTC midnight.
@@ -77,15 +103,29 @@ function weekRows(weekStart: Date, weekLogs: LogEntry[], items: Item[], note: st
     .map((item) => ({ item, macros: macrosFor(item, portions.get(item.id)!) }))
     .sort((a, b) => b.macros.calories - a.macros.calories);
 
-  const rows = weekItems.map(({ item, macros }) =>
-    macroRow(week, weekOf, item.name, portions.get(item.id)!, macros, false)
-  );
+  const rows: Row[] = [];
+  if (weekRawMacros.length > 0) {
+    const rawTotals = addMacros(ZERO_MACROS, weekRawMacros);
+    rows.push(macroRow(week, weekOf, "Additional raw macros", null, rawTotals, false));
+  }
+  for (const { item, macros } of weekItems) {
+    rows.push(macroRow(week, weekOf, item.name, portions.get(item.id)!, macros, false));
+  }
   const totalPortions = weekItems.reduce((sum, { item }) => sum + portions.get(item.id)!, 0);
-  rows.push([
-    ...macroRow(week, weekOf, "Total", totalPortions, sumMacros(items, portions), true),
-    note,
-  ]);
+  const totals = addMacros(sumMacros(items, portions), weekRawMacros);
+  rows.push([...macroRow(week, weekOf, "Total", totalPortions, totals, true), note]);
   return rows;
+}
+
+function groupByWeek<T extends { consumed_at: string }>(entries: T[]): Map<number, T[]> {
+  const byWeek = new Map<number, T[]>();
+  for (const entry of entries) {
+    const key = getWeekStart(new Date(entry.consumed_at)).getTime();
+    const group = byWeek.get(key) ?? [];
+    group.push(entry);
+    byWeek.set(key, group);
+  }
+  return byWeek;
 }
 
 /**
@@ -94,26 +134,33 @@ function weekRows(weekStart: Date, weekLogs: LogEntry[], items: Item[], note: st
  * down by day.
  */
 export async function downloadExcelExport(store: DataStore) {
-  const [{ default: writeExcelFile }, [items, logs, notes]] = await Promise.all([
+  const [{ default: writeExcelFile }, [items, logs, rawMacros, notes]] = await Promise.all([
     import("write-excel-file/browser"),
-    Promise.all([store.listItems(), store.listLogs(), store.listWeekNotes()]),
+    Promise.all([
+      store.listItems(),
+      store.listLogs(),
+      store.listRawMacros(),
+      store.listWeekNotes(),
+    ]),
   ]);
 
-  const logsByWeek = new Map<number, LogEntry[]>();
-  for (const log of logs) {
-    const key = getWeekStart(new Date(log.consumed_at)).getTime();
-    const group = logsByWeek.get(key) ?? [];
-    group.push(log);
-    logsByWeek.set(key, group);
-  }
+  const logsByWeek = groupByWeek(logs);
+  const rawMacrosByWeek = groupByWeek(rawMacros);
+  const weekKeys = new Set([...logsByWeek.keys(), ...rawMacrosByWeek.keys()]);
 
   const rowsByYear = new Map<number, Row[]>();
-  for (const key of [...logsByWeek.keys()].sort((a, b) => a - b)) {
+  for (const key of [...weekKeys].sort((a, b) => a - b)) {
     const weekStart = new Date(key);
     const { year } = getISOWeek(weekStart);
     const rows = rowsByYear.get(year) ?? [];
     rows.push(
-      ...weekRows(weekStart, logsByWeek.get(key)!, items, notes[localDateKey(weekStart)] ?? "")
+      ...weekRows(
+        weekStart,
+        logsByWeek.get(key) ?? [],
+        rawMacrosByWeek.get(key) ?? [],
+        items,
+        notes[localDateKey(weekStart)] ?? ""
+      )
     );
     rowsByYear.set(year, rows);
   }

@@ -46,6 +46,19 @@ export function sumMacros(items: Item[], portions: Map<string, number>): MacroTo
   return totals;
 }
 
+/** `totals` with each entry added on top, e.g. a week's items plus its additional raw macros. */
+export function addMacros(totals: MacroTotals, entries: MacroTotals[]): MacroTotals {
+  return entries.reduce(
+    (sum, entry) => ({
+      protein: sum.protein + entry.protein,
+      carbs: sum.carbs + entry.carbs,
+      fat: sum.fat + entry.fat,
+      calories: sum.calories + entry.calories,
+    }),
+    totals
+  );
+}
+
 /**
  * Each macro's share (0..1) of the calories coming from protein, carbs and
  * fat (4/4/9 kcal per gram), or null when all three are zero.

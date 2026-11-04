@@ -5,8 +5,37 @@ import {
   clearLocalGoals,
   clearLocalMovements,
   clearLocalNotes,
+  clearLocalRawMacros,
 } from "@/lib/store/local";
 import { remoteStore } from "@/lib/store/remote";
+
+/**
+ * Same one-time upload as items/logs below, for additional raw macros: only
+ * into an account with none yet, and local data is cleared only if it worked.
+ */
+async function migrateLocalRawMacrosToRemote(): Promise<void> {
+  const localEntries = await localStore.listRawMacros();
+  if (localEntries.length === 0) return;
+
+  try {
+    if ((await remoteStore.listRawMacros()).length > 0) return;
+    const { error } = await createClient()
+      .from("raw_macros")
+      .insert(
+        localEntries.map(({ protein, carbs, fat, calories, consumed_at }) => ({
+          protein,
+          carbs,
+          fat,
+          calories,
+          consumed_at,
+        }))
+      );
+    if (error) throw error;
+    clearLocalRawMacros();
+  } catch (err) {
+    console.error("Failed to migrate raw macros to Supabase:", err);
+  }
+}
 
 /**
  * Same one-time upload as items/logs below, for movements and their logs:
@@ -90,6 +119,7 @@ export async function migrateLocalDataToRemote(): Promise<void> {
   await migrateLocalGoalsToRemote();
   await migrateLocalNotesToRemote();
   await migrateLocalMovementsToRemote();
+  await migrateLocalRawMacrosToRemote();
 
   const supabase = createClient();
 

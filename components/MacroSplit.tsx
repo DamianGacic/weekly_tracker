@@ -109,7 +109,7 @@ export function MacroPie({ macros, size = 18 }: { macros: MacroGrams; size?: num
 }
 
 /** A week's overall calorie split: a larger pie with each macro's share labeled beside it. */
-export function MacroSplitSummary({ macros }: { macros: MacroGrams }) {
+export function MacroSplitSummary({ macros }: { macros: MacroTotals }) {
   const shares = calorieShares(macros.protein, macros.carbs, macros.fat);
   const pct = shares && percents(shares);
   return (
@@ -128,7 +128,9 @@ export function MacroSplitSummary({ macros }: { macros: MacroGrams }) {
             ))}
           </ul>
         ) : (
-          <span className="text-sm text-muted-foreground">Nothing logged yet</span>
+          <span className="text-sm text-muted-foreground">
+            {macros.calories > 0 ? "No macros entered" : "Nothing logged yet"}
+          </span>
         )}
       </div>
     </div>

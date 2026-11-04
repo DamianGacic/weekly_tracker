@@ -26,6 +26,18 @@ export type ItemInput = {
   calories: number;
 };
 
+/** Macros added to a week directly rather than through an item, for exceptions and rare foods. */
+export type RawMacroEntry = {
+  id: string;
+  protein: number;
+  carbs: number;
+  fat: number;
+  calories: number;
+  consumed_at: string;
+};
+
+export type RawMacroInput = Omit<RawMacroEntry, "id" | "consumed_at">;
+
 export type GoalStepMode = "flat" | "percent";
 
 /** A weekly target that carries over from week to week, optionally changing by `step` each week. */
@@ -86,6 +98,10 @@ export interface DataStore {
    */
   logItem(itemId: string, consumedAt?: string, amount?: number): Promise<LogEntry>;
   deleteLog(logId: string): Promise<void>;
+  listRawMacros(): Promise<RawMacroEntry[]>;
+  /** `consumedAt` defaults to now; pass it explicitly to add to a past week. */
+  addRawMacros(input: RawMacroInput, consumedAt?: string): Promise<RawMacroEntry>;
+  deleteRawMacros(entryId: string): Promise<void>;
   getGoals(): Promise<Goals>;
   saveGoals(goals: Goals): Promise<Goals>;
   listWeekNotes(): Promise<WeekNotes>;

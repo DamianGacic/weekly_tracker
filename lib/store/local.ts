@@ -4,6 +4,9 @@ import type {
   Item,
   LogEntry,
   ItemInput,
+  Lift,
+  LiftInput,
+  LiftSet,
   Movement,
   MovementInput,
   MovementLog,
@@ -21,6 +24,19 @@ const GOALS_KEY = "weekly:goals";
 const NOTES_KEY = "weekly:notes";
 const MOVEMENTS_KEY = "weekly:movements";
 const MOVEMENT_LOGS_KEY = "weekly:movement-logs";
+const LIFTS_KEY = "weekly:lifts";
+const LIFT_SETS_KEY = "weekly:lift-sets";
+
+/**
+ * Lift names are unique per account in Supabase, so they're kept unique here
+ * too: otherwise uploading local lifts on sign-in would fail. Thrown with the
+ * same code Postgres uses, so the dialog shows the same message either way.
+ */
+function assertUniqueLiftName(lifts: Lift[], name: string, exceptId?: string) {
+  if (lifts.some((lift) => lift.name === name && lift.id !== exceptId)) {
+    throw Object.assign(new Error(`You already have a lift called “${name}”.`), { code: "23505" });
+  }
+}
 
 function readNotes(): WeekNotes {
   if (typeof window === "undefined") return {};
@@ -82,6 +98,12 @@ export function clearLocalMovements() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(MOVEMENTS_KEY);
   window.localStorage.removeItem(MOVEMENT_LOGS_KEY);
+}
+
+export function clearLocalLifts() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(LIFTS_KEY);
+  window.localStorage.removeItem(LIFT_SETS_KEY);
 }
 
 export const localStore: DataStore = {
@@ -211,6 +233,47 @@ export const localStore: DataStore = {
     write(
       MOVEMENT_LOGS_KEY,
       read<MovementLog>(MOVEMENT_LOGS_KEY).filter((log) => log.id !== logId)
+    );
+  },
+  async listLifts() {
+    return read<Lift>(LIFTS_KEY).sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async createLift(input: LiftInput) {
+    const lifts = read<Lift>(LIFTS_KEY);
+    assertUniqueLiftName(lifts, input.name);
+    const lift: Lift = { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...input };
+    write(LIFTS_KEY, [...lifts, lift]);
+    return lift;
+  },
+  async updateLift(liftId: string, input: LiftInput) {
+    const lifts = read<Lift>(LIFTS_KEY);
+    const index = lifts.findIndex((lift) => lift.id === liftId);
+    if (index === -1) throw new Error("Lift not found.");
+    assertUniqueLiftName(lifts, input.name, liftId);
+    const updated: Lift = { ...lifts[index], ...input };
+    lifts[index] = updated;
+    write(LIFTS_KEY, lifts);
+    return updated;
+  },
+  async listLiftSets() {
+    return read<LiftSet>(LIFT_SETS_KEY);
+  },
+  async logLiftSets(liftId, { weight, reps }, count, loggedAt) {
+    const logged_at = loggedAt ?? new Date().toISOString();
+    const sets: LiftSet[] = Array.from({ length: count }, () => ({
+      id: crypto.randomUUID(),
+      lift_id: liftId,
+      weight,
+      reps,
+      logged_at,
+    }));
+    write(LIFT_SETS_KEY, [...read<LiftSet>(LIFT_SETS_KEY), ...sets]);
+    return sets;
+  },
+  async deleteLiftSet(setId: string) {
+    write(
+      LIFT_SETS_KEY,
+      read<LiftSet>(LIFT_SETS_KEY).filter((set) => set.id !== setId)
     );
   },
 };

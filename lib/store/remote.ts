@@ -5,11 +5,14 @@ import type {
   Goal,
   Goals,
   ItemInput,
+  Lift,
+  LiftInput,
   Movement,
   MovementInput,
   RawMacroInput,
 } from "@/lib/store/types";
 import { NO_GOALS } from "@/lib/goals";
+import { goalFromJson } from "@/lib/lifts";
 
 const ITEM_COLUMNS = "id, name, protein, carbs, fat, calories, staple, created_at";
 const LOG_COLUMNS = "id, item_id, consumed_at, amount";
@@ -19,9 +22,25 @@ const GOAL_COLUMNS =
 const MOVEMENT_COLUMNS =
   "id, name, kind, default_amount, goal_value, goal_anchor_week, goal_step, goal_step_mode, created_at";
 const MOVEMENT_LOG_COLUMNS = "id, movement_id, amount, logged_at";
+const LIFT_COLUMNS = "id, name, goal, created_at";
+const LIFT_SET_COLUMNS = "id, lift_id, weight, reps, logged_at";
+
+// Supabase answers a select with at most 1000 rows unless told otherwise, and
+// a few lifts at a few sets each pass that within a year, so lift sets are
+// fetched in pages of this size until a page comes back short.
+const LIFT_SETS_PAGE = 1000;
 
 type GoalsRow = Database["public"]["Tables"]["goals"]["Row"];
 type MovementRow = Database["public"]["Tables"]["movements"]["Row"];
+type LiftRow = Database["public"]["Tables"]["lifts"]["Row"];
+
+function liftFromRow(row: Omit<LiftRow, "user_id">): Lift {
+  return { id: row.id, name: row.name, goal: goalFromJson(row.goal), created_at: row.created_at };
+}
+
+function liftColumns(input: LiftInput) {
+  return { name: input.name, goal: input.goal };
+}
 
 function toGoal(
   value: number | null,
@@ -261,6 +280,66 @@ export const remoteStore: DataStore = {
   async deleteMovementLog(logId: string) {
     const supabase = createClient();
     const { error } = await supabase.from("movement_logs").delete().eq("id", logId);
+    if (error) throw error;
+  },
+  async listLifts() {
+    const supabase = createClient();
+    const { data, error } = await supabase.from("lifts").select(LIFT_COLUMNS).order("name");
+    if (error) throw error;
+    return (data ?? []).map(liftFromRow);
+  },
+  async createLift(input: LiftInput) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("lifts")
+      .insert(liftColumns(input))
+      .select(LIFT_COLUMNS)
+      .single();
+    if (error || !data) throw error ?? new Error("Could not create lift.");
+    return liftFromRow(data);
+  },
+  async updateLift(liftId: string, input: LiftInput) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("lifts")
+      .update(liftColumns(input))
+      .eq("id", liftId)
+      .select(LIFT_COLUMNS)
+      .single();
+    if (error || !data) throw error ?? new Error("Could not update lift.");
+    return liftFromRow(data);
+  },
+  async listLiftSets() {
+    const supabase = createClient();
+    const sets = [];
+    for (let from = 0; ; from += LIFT_SETS_PAGE) {
+      const { data, error } = await supabase
+        .from("lift_sets")
+        .select(LIFT_SET_COLUMNS)
+        // A stable order, so no row is skipped or repeated between pages.
+        .order("logged_at")
+        .order("id")
+        .range(from, from + LIFT_SETS_PAGE - 1);
+      if (error) throw error;
+      sets.push(...(data ?? []));
+      if ((data?.length ?? 0) < LIFT_SETS_PAGE) return sets;
+    }
+  },
+  async logLiftSets(liftId, { weight, reps }, count, loggedAt) {
+    const supabase = createClient();
+    const row = loggedAt
+      ? { lift_id: liftId, weight, reps, logged_at: loggedAt }
+      : { lift_id: liftId, weight, reps };
+    const { data, error } = await supabase
+      .from("lift_sets")
+      .insert(Array.from({ length: count }, () => row))
+      .select(LIFT_SET_COLUMNS);
+    if (error || !data) throw error ?? new Error("Could not log sets.");
+    return data;
+  },
+  async deleteLiftSet(setId: string) {
+    const supabase = createClient();
+    const { error } = await supabase.from("lift_sets").delete().eq("id", setId);
     if (error) throw error;
   },
 };

@@ -33,10 +33,11 @@ away, no Supabase project required. Data lives in `localStorage` until you sign 
    [`supabase/migrations/0003_log_amounts.sql`](supabase/migrations/0003_log_amounts.sql),
    [`supabase/migrations/0004_week_notes.sql`](supabase/migrations/0004_week_notes.sql),
    [`supabase/migrations/0005_movements.sql`](supabase/migrations/0005_movements.sql),
-   [`supabase/migrations/0006_item_staples.sql`](supabase/migrations/0006_item_staples.sql) and
-   [`supabase/migrations/0007_raw_macros.sql`](supabase/migrations/0007_raw_macros.sql).
-   These create the `items`/`logs`/`raw_macros`/`goals`/`week_notes`/`movements`/`movement_logs`
-   tables and their Row Level Security policies.
+   [`supabase/migrations/0006_item_staples.sql`](supabase/migrations/0006_item_staples.sql),
+   [`supabase/migrations/0007_raw_macros.sql`](supabase/migrations/0007_raw_macros.sql) and
+   [`supabase/migrations/0008_lifts.sql`](supabase/migrations/0008_lifts.sql).
+   These create the `items`/`logs`/`raw_macros`/`goals`/`week_notes`/`movements`/`movement_logs`/
+   `lifts`/`lift_sets` tables and their Row Level Security policies.
 3. Under **Authentication → Sign In / Providers**, confirm Email is enabled (it is by default; no
    password is required — this app uses magic links).
 4. Under **Authentication → URL Configuration**, set:
@@ -69,6 +70,11 @@ actually restricts each signed-in user to their own rows.
   are just a filter/sum over the full log list and any past week can be recomputed on demand.
 - Additional raw macros (`raw_macros`) add to a week without an item, for exceptions and rare
   foods. Each entry counts toward its week's totals, goals, History and exports just like a log.
+- Lifts (`lift_sets`, one row per set) are logged with a weight and reps per set. A lift's weekly
+  goal is a list of lines like "3 sets of 105 kg for 4 reps"; a set counts toward a line when it
+  has at least that weight and at least those reps, each set counts once, and harder lines fill
+  first (`goalProgress` in `lib/lifts.ts`). Sets are listed hardest first, by estimated one-rep
+  max.
 - Local mode (`lib/store/local.ts`) and Supabase mode (`lib/store/remote.ts`) implement the same
   `DataStore` interface (`lib/store/types.ts`), so the UI components don't know or care which one
   is active — `lib/store/AuthProvider.tsx` picks based on sign-in state.

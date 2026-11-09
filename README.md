@@ -69,6 +69,10 @@ actually restricts each signed-in user to their own rows.
   are just a filter/sum over the full log list and any past week can be recomputed on demand.
 - Additional raw macros (`raw_macros`) add to a week without an item, for exceptions and rare
   foods. Each entry counts toward its week's totals, goals, History and exports just like a log.
+- Supabase answers a single select with at most 1000 rows ("Max rows" in the API settings) and
+  doesn't say when it stopped there. Every list in `lib/store/remote.ts` is therefore read
+  through `selectAll` (`lib/supabase/selectAll.ts`), which fetches page by page until nothing is
+  left. Any new list read must use it too, ordered by something unique.
 - Local mode (`lib/store/local.ts`) and Supabase mode (`lib/store/remote.ts`) implement the same
   `DataStore` interface (`lib/store/types.ts`), so the UI components don't know or care which one
   is active — `lib/store/AuthProvider.tsx` picks based on sign-in state.

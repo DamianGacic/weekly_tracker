@@ -10,6 +10,7 @@ import type {
   RawMacroInput,
 } from "@/lib/store/types";
 import { NO_GOALS } from "@/lib/goals";
+import { selectAll } from "@/lib/supabase/selectAll";
 
 const ITEM_COLUMNS = "id, name, protein, carbs, fat, calories, staple, created_at";
 const LOG_COLUMNS = "id, item_id, consumed_at, amount";
@@ -19,6 +20,10 @@ const GOAL_COLUMNS =
 const MOVEMENT_COLUMNS =
   "id, name, kind, default_amount, goal_value, goal_anchor_week, goal_step, goal_step_mode, created_at";
 const MOVEMENT_LOG_COLUMNS = "id, movement_id, amount, logged_at";
+
+// Every list below is read through `selectAll`: a plain select returns at most
+// 1000 rows and quietly drops the rest. Each is ordered by something unique,
+// which paging needs, and the order the pages already expected is kept.
 
 type GoalsRow = Database["public"]["Tables"]["goals"]["Row"];
 type MovementRow = Database["public"]["Tables"]["movements"]["Row"];
@@ -70,15 +75,15 @@ function goalsFromRow(row: Omit<GoalsRow, "user_id" | "updated_at">): Goals {
 export const remoteStore: DataStore = {
   async listItems() {
     const supabase = createClient();
-    const { data, error } = await supabase.from("items").select(ITEM_COLUMNS).order("name");
-    if (error) throw error;
-    return data ?? [];
+    return selectAll((from, to) =>
+      supabase.from("items").select(ITEM_COLUMNS).order("name").order("id").range(from, to)
+    );
   },
   async listLogs() {
     const supabase = createClient();
-    const { data, error } = await supabase.from("logs").select(LOG_COLUMNS);
-    if (error) throw error;
-    return data ?? [];
+    return selectAll((from, to) =>
+      supabase.from("logs").select(LOG_COLUMNS).order("consumed_at").order("id").range(from, to)
+    );
   },
   async createItem(input: ItemInput) {
     const supabase = createClient();
@@ -133,12 +138,14 @@ export const remoteStore: DataStore = {
   },
   async listRawMacros() {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("raw_macros")
-      .select(RAW_MACRO_COLUMNS)
-      .order("consumed_at");
-    if (error) throw error;
-    return data ?? [];
+    return selectAll((from, to) =>
+      supabase
+        .from("raw_macros")
+        .select(RAW_MACRO_COLUMNS)
+        .order("consumed_at")
+        .order("id")
+        .range(from, to)
+    );
   },
   async addRawMacros(input: RawMacroInput, consumedAt?: string) {
     const supabase = createClient();
@@ -188,9 +195,10 @@ export const remoteStore: DataStore = {
   },
   async listWeekNotes() {
     const supabase = createClient();
-    const { data, error } = await supabase.from("week_notes").select("week_start, note");
-    if (error) throw error;
-    return Object.fromEntries((data ?? []).map((row) => [row.week_start, row.note]));
+    const rows = await selectAll((from, to) =>
+      supabase.from("week_notes").select("week_start, note").order("week_start").range(from, to)
+    );
+    return Object.fromEntries(rows.map((row) => [row.week_start, row.note]));
   },
   async saveWeekNote(weekKey: string, note: string) {
     const supabase = createClient();
@@ -213,9 +221,10 @@ export const remoteStore: DataStore = {
   },
   async listMovements() {
     const supabase = createClient();
-    const { data, error } = await supabase.from("movements").select(MOVEMENT_COLUMNS).order("name");
-    if (error) throw error;
-    return (data ?? []).map(movementFromRow);
+    const rows = await selectAll((from, to) =>
+      supabase.from("movements").select(MOVEMENT_COLUMNS).order("name").order("id").range(from, to)
+    );
+    return rows.map(movementFromRow);
   },
   async createMovement(input: MovementInput) {
     const supabase = createClient();
@@ -240,9 +249,14 @@ export const remoteStore: DataStore = {
   },
   async listMovementLogs() {
     const supabase = createClient();
-    const { data, error } = await supabase.from("movement_logs").select(MOVEMENT_LOG_COLUMNS);
-    if (error) throw error;
-    return data ?? [];
+    return selectAll((from, to) =>
+      supabase
+        .from("movement_logs")
+        .select(MOVEMENT_LOG_COLUMNS)
+        .order("logged_at")
+        .order("id")
+        .range(from, to)
+    );
   },
   async logMovement(movementId: string, amount: number, loggedAt?: string) {
     const supabase = createClient();

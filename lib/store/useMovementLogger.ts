@@ -24,6 +24,8 @@ export function useMovementLogger({
   onLogsChange: (updater: (prev: MovementLog[]) => MovementLog[]) => void;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
+  // Set when a change didn't save and was undone on screen (see SaveError).
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function logMovement(movementId: string, amount: number) {
     setPendingId(movementId);
@@ -44,8 +46,11 @@ export function useMovementLogger({
     try {
       const log = await store.logMovement(movementId, amount, loggedAt.toISOString());
       onLogsChange((prev) => prev.map((l) => (l.id === tempId ? log : l)));
-    } catch {
+      setSaveError(null);
+    } catch (err) {
+      console.error("Could not log move:", err);
       onLogsChange((prev) => prev.filter((l) => l.id !== tempId));
+      setSaveError("Couldn't save that, so it wasn't logged. Check your connection and try again.");
     }
     setPendingId(null);
   }
@@ -61,11 +66,14 @@ export function useMovementLogger({
 
     try {
       await store.deleteMovementLog(mostRecent.id);
-    } catch {
+      setSaveError(null);
+    } catch (err) {
+      console.error("Could not undo move:", err);
       onLogsChange((prev) => [...prev, mostRecent]);
+      setSaveError("Couldn't undo that, so it's still logged. Check your connection and try again.");
     }
     setPendingId(null);
   }
 
-  return { pendingId, logMovement, unlogMovement };
+  return { pendingId, saveError, logMovement, unlogMovement };
 }

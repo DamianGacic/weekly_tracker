@@ -25,6 +25,7 @@ import { MovementAmountDialog } from "@/components/MovementAmountDialog";
 import { MovementDialog } from "@/components/MovementDialog";
 import { MovementLogEditor } from "@/components/MovementLogEditor";
 import { ROUND_BUTTON } from "@/components/WeekLogEditor";
+import { SaveError } from "@/components/SaveError";
 
 export function MovementDashboardClient() {
   const { store, movements, logs, setLogs, loading, error, createMovement } = useMovementData();
@@ -48,7 +49,7 @@ export function MovementDashboardClient() {
   // Moves with a goal are logged from their goal display; the rest from the list below.
   const withGoals = movements.filter((movement) => movement.goal);
   const withoutGoals = movements.filter((movement) => !movement.goal);
-  const { pendingId, logMovement, unlogMovement } = useMovementLogger({
+  const { pendingId, saveError, logMovement, unlogMovement } = useMovementLogger({
     store,
     weekLogs,
     weekStart,
@@ -67,6 +68,7 @@ export function MovementDashboardClient() {
 
   return (
     <div className="flex flex-col gap-6">
+      <SaveError message={saveError} />
       <Card>
         <CardHeader>
           <CardTitle>This week</CardTitle>

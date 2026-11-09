@@ -36,6 +36,7 @@ export function ItemsClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
   const [filter, setFilter] = useState<"all" | "staples">("all");
@@ -43,11 +44,20 @@ export function ItemsClient() {
   useEffect(() => {
     if (status === "loading") return;
     let active = true;
-    store.listItems().then((loadedItems) => {
-      if (!active) return;
-      setItems(loadedItems);
-      setLoading(false);
-    });
+    store
+      .listItems()
+      .then((loadedItems) => {
+        if (!active) return;
+        setItems(loadedItems);
+        setError(null);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Could not load items:", err);
+        if (!active) return;
+        setError("Couldn't load your items. Check your connection and reload the page.");
+        setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -86,6 +96,9 @@ export function ItemsClient() {
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
+  }
+  if (error) {
+    return <p className="text-sm text-destructive">{error}</p>;
   }
 
   return (

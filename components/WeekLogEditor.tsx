@@ -23,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { MacroLine, MacroPie } from "@/components/MacroSplit";
 import { PortionDialog } from "@/components/PortionDialog";
 import { RawMacroDialog } from "@/components/RawMacroDialog";
+import { SaveError } from "@/components/SaveError";
 
 // Grace period before the "logged" list re-sorts by calories, so an item
 // doesn't jump position right after being clicked and cause a misclick on
@@ -68,6 +69,9 @@ export function WeekLogEditor({
   const [pendingCatalogName, setPendingCatalogName] = useState<string | null>(null);
   const [partialItem, setPartialItem] = useState<Item | null>(null);
   const [partialOpen, setPartialOpen] = useState(false);
+  // Shown when a change didn't reach the store and was undone on screen, so
+  // that it never goes unnoticed.
+  const [saveError, setSaveError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const portions = useMemo(() => portionsByItem(weekLogs), [weekLogs]);
@@ -143,10 +147,17 @@ export function WeekLogEditor({
     try {
       const log = await store.logItem(itemId, consumedAt.toISOString(), amount);
       onLogsChange((prev) => prev.map((l) => (l.id === tempId ? log : l)));
-    } catch {
+      setSaveError(null);
+    } catch (err) {
+      console.error("Could not log item:", err);
       onLogsChange((prev) => prev.filter((l) => l.id !== tempId));
+      setSaveError(`Couldn't save that, so ${itemName(itemId)} wasn't logged. Check your connection and try again.`);
     }
     setPendingId(null);
+  }
+
+  function itemName(itemId: string) {
+    return items.find((item) => item.id === itemId)?.name ?? "it";
   }
 
   async function unlogItem(itemId: string) {
@@ -160,8 +171,11 @@ export function WeekLogEditor({
 
     try {
       await store.deleteLog(mostRecent.id);
-    } catch {
+      setSaveError(null);
+    } catch (err) {
+      console.error("Could not undo log:", err);
       onLogsChange((prev) => [...prev, mostRecent]);
+      setSaveError(`Couldn't undo that, so ${itemName(itemId)} is still logged. Check your connection and try again.`);
     }
     setPendingId(null);
   }
@@ -172,6 +186,9 @@ export function WeekLogEditor({
       const item = await store.createItem(food);
       onItemsChange((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)));
       await logItem(item.id);
+    } catch (err) {
+      console.error("Could not add food:", err);
+      setSaveError(`Couldn't add ${food.name}, so it wasn't logged. Check your connection and try again.`);
     } finally {
       setPendingCatalogName(null);
     }
@@ -187,8 +204,11 @@ export function WeekLogEditor({
     onRawMacrosChange((prev) => prev.filter((e) => e.id !== entry.id));
     try {
       await store.deleteRawMacros(entry.id);
-    } catch {
+      setSaveError(null);
+    } catch (err) {
+      console.error("Could not remove raw macros:", err);
       onRawMacrosChange((prev) => [...prev, entry]);
+      setSaveError("Couldn't remove those raw macros, so they're still counted. Check your connection and try again.");
     }
   }
 
@@ -199,6 +219,7 @@ export function WeekLogEditor({
 
   return (
     <div className="flex flex-col gap-3">
+      <SaveError message={saveError} />
       <div ref={containerRef} className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Input

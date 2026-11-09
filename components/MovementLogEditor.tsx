@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MovementAmountDialog } from "@/components/MovementAmountDialog";
 import { ROUND_BUTTON } from "@/components/WeekLogEditor";
+import { SaveError } from "@/components/SaveError";
 
 // Same grace period as the macro list before rows re-sort after a tap.
 const RESORT_DELAY_MS = 4000;
@@ -39,7 +40,7 @@ export function MovementLogEditor({
   actions?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
-  const { pendingId, logMovement, unlogMovement } = useMovementLogger({
+  const { pendingId, saveError, logMovement, unlogMovement } = useMovementLogger({
     store,
     weekLogs,
     weekStart,
@@ -103,6 +104,7 @@ export function MovementLogEditor({
 
   return (
     <div className="flex flex-col gap-3">
+      <SaveError message={saveError} />
       <div ref={containerRef} className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Input

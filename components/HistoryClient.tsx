@@ -18,6 +18,7 @@ import { TrackingGap } from "@/components/TrackingGap";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
 import { MacroSplitSummary } from "@/components/MacroSplit";
 import { WeekNote, WeekNoteView, withWeekNote } from "@/components/WeekNote";
+import { LoadWarning } from "@/components/LoadWarning";
 
 type WeekGroup = { weekStart: Date; weekLogs: LogEntry[]; weekRawMacros: RawMacroEntry[] };
 
@@ -30,32 +31,46 @@ export function HistoryClient() {
   const [rawMacros, setRawMacros] = useState<RawMacroEntry[]>([]);
   const [notes, setNotes] = useState<WeekNotes>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Optional parts that failed to load, named above the weeks (see DashboardClient).
+  const [missing, setMissing] = useState<string[]>([]);
   const [expandedKey, setExpandedKey] = useState<number | null>(null);
 
   useEffect(() => {
     if (status === "loading") return;
     let active = true;
+    const failed: string[] = [];
+    // Notes and raw macros are optional, so failing to load them shouldn't
+    // take History down; the page says what's missing instead.
+    function optional<T>(load: Promise<T>, label: string, fallback: T): Promise<T> {
+      return load.catch((err) => {
+        console.error(`Could not load ${label}:`, err);
+        failed.push(label);
+        return fallback;
+      });
+    }
     Promise.all([
       store.listItems(),
       store.listLogs(),
-      // Notes are optional, so failing to load them shouldn't take History down.
-      store.listWeekNotes().catch((err) => {
-        console.error("Could not load week notes:", err);
-        return {};
-      }),
-      // Same for raw macros.
-      store.listRawMacros().catch((err) => {
-        console.error("Could not load raw macros:", err);
-        return [];
-      }),
-    ]).then(([loadedItems, loadedLogs, loadedNotes, loadedRawMacros]) => {
-      if (!active) return;
-      setItems(loadedItems);
-      setLogs(loadedLogs);
-      setRawMacros(loadedRawMacros);
-      setNotes(loadedNotes);
-      setLoading(false);
-    });
+      optional(store.listWeekNotes(), "week notes", {} as WeekNotes),
+      optional(store.listRawMacros(), "additional raw macros", [] as RawMacroEntry[]),
+    ])
+      .then(([loadedItems, loadedLogs, loadedNotes, loadedRawMacros]) => {
+        if (!active) return;
+        setItems(loadedItems);
+        setLogs(loadedLogs);
+        setRawMacros(loadedRawMacros);
+        setNotes(loadedNotes);
+        setMissing(failed);
+        setError(null);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Could not load items or logs:", err);
+        if (!active) return;
+        setError("Couldn't load your items and logs. Check your connection and reload the page.");
+        setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -88,10 +103,14 @@ export function HistoryClient() {
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
+  if (error) {
+    return <p className="text-sm text-destructive">{error}</p>;
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold">Past weeks</h1>
+      <LoadWarning missing={missing} />
       {weekGroups.length === 0 ? (
         <p className="text-sm text-muted-foreground">No completed weeks yet.</p>
       ) : (

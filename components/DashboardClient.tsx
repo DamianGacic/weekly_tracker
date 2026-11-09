@@ -13,6 +13,7 @@ import { MacroSplitSummary } from "@/components/MacroSplit";
 import { WeekNote, withWeekNote } from "@/components/WeekNote";
 import { ItemDialog } from "@/components/ItemDialog";
 import { WeekLogEditor } from "@/components/WeekLogEditor";
+import { LoadWarning } from "@/components/LoadWarning";
 
 export function DashboardClient() {
   const { status, syncVersion } = useAuth();
@@ -24,38 +25,49 @@ export function DashboardClient() {
   const [goals, setGoals] = useState<Goals>(NO_GOALS);
   const [notes, setNotes] = useState<WeekNotes>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Optional parts that failed to load: shown above the totals, so they're
+  // never quietly missing from them.
+  const [missing, setMissing] = useState<string[]>([]);
 
   useEffect(() => {
     if (status === "loading") return;
     let active = true;
+    const failed: string[] = [];
+    // Goals, notes and raw macros are optional, so failing to load them (e.g.
+    // their Supabase migration hasn't been run) shouldn't take the dashboard
+    // down; the page says what's missing instead.
+    function optional<T>(load: Promise<T>, label: string, fallback: T): Promise<T> {
+      return load.catch((err) => {
+        console.error(`Could not load ${label}:`, err);
+        failed.push(label);
+        return fallback;
+      });
+    }
     Promise.all([
       store.listItems(),
       store.listLogs(),
-      // Goals are optional, so failing to load them (e.g. the Supabase
-      // migration for them hasn't been run) shouldn't take the dashboard down.
-      store.getGoals().catch((err) => {
-        console.error("Could not load goals:", err);
-        return NO_GOALS;
-      }),
-      // Same for notes.
-      store.listWeekNotes().catch((err) => {
-        console.error("Could not load week notes:", err);
-        return {};
-      }),
-      // Same for raw macros.
-      store.listRawMacros().catch((err) => {
-        console.error("Could not load raw macros:", err);
-        return [];
-      }),
-    ]).then(([loadedItems, loadedLogs, loadedGoals, loadedNotes, loadedRawMacros]) => {
-      if (!active) return;
-      setItems(loadedItems);
-      setLogs(loadedLogs);
-      setRawMacros(loadedRawMacros);
-      setGoals(loadedGoals);
-      setNotes(loadedNotes);
-      setLoading(false);
-    });
+      optional(store.getGoals(), "goals", NO_GOALS),
+      optional(store.listWeekNotes(), "week notes", {} as WeekNotes),
+      optional(store.listRawMacros(), "additional raw macros", [] as RawMacroEntry[]),
+    ])
+      .then(([loadedItems, loadedLogs, loadedGoals, loadedNotes, loadedRawMacros]) => {
+        if (!active) return;
+        setItems(loadedItems);
+        setLogs(loadedLogs);
+        setRawMacros(loadedRawMacros);
+        setGoals(loadedGoals);
+        setNotes(loadedNotes);
+        setMissing(failed);
+        setError(null);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Could not load items or logs:", err);
+        if (!active) return;
+        setError("Couldn't load your items and logs. Check your connection and reload the page.");
+        setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -98,15 +110,24 @@ export function DashboardClient() {
   }
 
   async function handleSaveGoals(next: Goals) {
+    // Both goals are saved together, so saving from a form that never got the
+    // stored goals would overwrite the one not being edited.
+    if (missing.includes("goals")) {
+      throw new Error("Your goals couldn't be loaded, so saving now could overwrite them. Reload the page first.");
+    }
     setGoals(await store.saveGoals(next));
   }
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
+  if (error) {
+    return <p className="text-sm text-destructive">{error}</p>;
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start">
+      <LoadWarning missing={missing} className="lg:col-span-2" />
       <GoalsCard goals={goals} weekStart={weekStart} onSave={handleSaveGoals} />
 
       <div className="flex min-w-0 flex-col gap-6">

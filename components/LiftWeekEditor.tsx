@@ -15,6 +15,7 @@ import {
 } from "@/lib/lifts";
 import { getWeekEnd } from "@/lib/week";
 import { useLiftLogger } from "@/lib/store/useLiftLogger";
+import { SaveError } from "@/components/SaveError";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -72,7 +73,7 @@ export function LiftWeekEditor({
   const [dialog, setDialog] = useState<{ lift: Lift; initial: SetSpec | null } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { pendingId, logSets, removeSet } = useLiftLogger({
+  const { pendingId, saveError, logSets, removeSet } = useLiftLogger({
     store,
     weekSets,
     weekStart,
@@ -125,6 +126,7 @@ export function LiftWeekEditor({
 
   return (
     <div className="flex flex-col gap-3">
+      <SaveError message={saveError} />
       <div ref={containerRef} className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Input

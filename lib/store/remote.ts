@@ -27,12 +27,6 @@ const MOVEMENT_COLUMNS =
 const MOVEMENT_LOG_COLUMNS = "id, movement_id, amount, logged_at";
 const LIFT_COLUMNS = "id, name, goal, created_at";
 const LIFT_SET_COLUMNS = "id, lift_id, weight, reps, logged_at";
-
-// Supabase answers a select with at most 1000 rows unless told otherwise, and
-// a few lifts at a few sets each pass that within a year, so lift sets are
-// fetched in pages of this size until a page comes back short.
-const LIFT_SETS_PAGE = 1000;
-
 const HABIT_COLUMNS = "id, name, goal_days, includes, created_at";
 const HABIT_CHECK_COLUMNS = "habit_id, day, auto";
 
@@ -303,9 +297,10 @@ export const remoteStore: DataStore = {
   },
   async listLifts() {
     const supabase = createClient();
-    const { data, error } = await supabase.from("lifts").select(LIFT_COLUMNS).order("name");
-    if (error) throw error;
-    return (data ?? []).map(liftFromRow);
+    const rows = await selectAll((from, to) =>
+      supabase.from("lifts").select(LIFT_COLUMNS).order("name").order("id").range(from, to)
+    );
+    return rows.map(liftFromRow);
   },
   async createLift(input: LiftInput) {
     const supabase = createClient();
@@ -330,19 +325,14 @@ export const remoteStore: DataStore = {
   },
   async listLiftSets() {
     const supabase = createClient();
-    const sets = [];
-    for (let from = 0; ; from += LIFT_SETS_PAGE) {
-      const { data, error } = await supabase
+    return selectAll((from, to) =>
+      supabase
         .from("lift_sets")
         .select(LIFT_SET_COLUMNS)
-        // A stable order, so no row is skipped or repeated between pages.
         .order("logged_at")
         .order("id")
-        .range(from, from + LIFT_SETS_PAGE - 1);
-      if (error) throw error;
-      sets.push(...(data ?? []));
-      if ((data?.length ?? 0) < LIFT_SETS_PAGE) return sets;
-    }
+        .range(from, to)
+    );
   },
   async logLiftSets(liftId, { weight, reps }, count, loggedAt) {
     const supabase = createClient();

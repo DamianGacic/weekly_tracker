@@ -41,6 +41,8 @@ export function useLiftLogger({
   onSetsChange: (updater: (prev: LiftSet[]) => LiftSet[]) => void;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
+  // Set when a change didn't save and was undone on screen (see SaveError).
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   /** Logs `count` sets of `spec` for the lift. */
   async function logSets(liftId: string, spec: SetSpec, count = 1) {
@@ -59,9 +61,13 @@ export function useLiftLogger({
     try {
       const saved = await store.logLiftSets(liftId, spec, count, loggedAt);
       onSetsChange((prev) => [...prev.filter((s) => !tempIds.has(s.id)), ...saved]);
+      setSaveError(null);
     } catch (err) {
       console.error("Could not log sets:", err);
       onSetsChange((prev) => prev.filter((s) => !tempIds.has(s.id)));
+      setSaveError(
+        `Couldn't save that, so the ${count === 1 ? "set wasn't" : "sets weren't"} logged. Check your connection and try again.`
+      );
     }
     setPendingId(null);
   }
@@ -78,12 +84,14 @@ export function useLiftLogger({
 
     try {
       await store.deleteLiftSet(mostRecent.id);
+      setSaveError(null);
     } catch (err) {
       console.error("Could not remove set:", err);
       onSetsChange((prev) => [...prev, mostRecent]);
+      setSaveError("Couldn't remove that set, so it's still logged. Check your connection and try again.");
     }
     setPendingId(null);
   }
 
-  return { pendingId, logSets, removeSet };
+  return { pendingId, saveError, logSets, removeSet };
 }

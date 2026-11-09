@@ -1,6 +1,9 @@
 import type {
   DataStore,
   Goals,
+  Habit,
+  HabitCheck,
+  HabitInput,
   Item,
   LogEntry,
   ItemInput,
@@ -21,6 +24,19 @@ const GOALS_KEY = "weekly:goals";
 const NOTES_KEY = "weekly:notes";
 const MOVEMENTS_KEY = "weekly:movements";
 const MOVEMENT_LOGS_KEY = "weekly:movement-logs";
+const HABITS_KEY = "weekly:habits";
+const HABIT_CHECKS_KEY = "weekly:habit-checks";
+
+/**
+ * Habit names are unique per account in Supabase, so they're kept unique here
+ * too: otherwise uploading local habits on sign-in would fail. Thrown with the
+ * same code Postgres uses, so the dialog shows the same message either way.
+ */
+function assertUniqueHabitName(habits: Habit[], name: string, exceptId?: string) {
+  if (habits.some((habit) => habit.name === name && habit.id !== exceptId)) {
+    throw Object.assign(new Error(`You already have a habit called “${name}”.`), { code: "23505" });
+  }
+}
 
 function readNotes(): WeekNotes {
   if (typeof window === "undefined") return {};
@@ -82,6 +98,12 @@ export function clearLocalMovements() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(MOVEMENTS_KEY);
   window.localStorage.removeItem(MOVEMENT_LOGS_KEY);
+}
+
+export function clearLocalHabits() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(HABITS_KEY);
+  window.localStorage.removeItem(HABIT_CHECKS_KEY);
 }
 
 export const localStore: DataStore = {
@@ -211,6 +233,47 @@ export const localStore: DataStore = {
     write(
       MOVEMENT_LOGS_KEY,
       read<MovementLog>(MOVEMENT_LOGS_KEY).filter((log) => log.id !== logId)
+    );
+  },
+  async listHabits() {
+    return read<Habit>(HABITS_KEY).sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async createHabit(input: HabitInput) {
+    const habits = read<Habit>(HABITS_KEY);
+    assertUniqueHabitName(habits, input.name);
+    const habit: Habit = {
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      ...input,
+    };
+    write(HABITS_KEY, [...habits, habit]);
+    return habit;
+  },
+  async updateHabit(habitId: string, input: HabitInput) {
+    const habits = read<Habit>(HABITS_KEY);
+    const index = habits.findIndex((habit) => habit.id === habitId);
+    if (index === -1) throw new Error("Habit not found.");
+    assertUniqueHabitName(habits, input.name, habitId);
+    const updated: Habit = { ...habits[index], ...input };
+    habits[index] = updated;
+    write(HABITS_KEY, habits);
+    return updated;
+  },
+  async listHabitChecks() {
+    return read<HabitCheck>(HABIT_CHECKS_KEY);
+  },
+  async addHabitChecks(checks: HabitCheck[]) {
+    const existing = read<HabitCheck>(HABIT_CHECKS_KEY);
+    const taken = new Set(existing.map((check) => `${check.habit_id}|${check.day}`));
+    const added = checks.filter((check) => !taken.has(`${check.habit_id}|${check.day}`));
+    write(HABIT_CHECKS_KEY, [...existing, ...added]);
+  },
+  async removeHabitChecks(day: string, habitIds: string[]) {
+    write(
+      HABIT_CHECKS_KEY,
+      read<HabitCheck>(HABIT_CHECKS_KEY).filter(
+        (check) => check.day !== day || !habitIds.includes(check.habit_id)
+      )
     );
   },
 };

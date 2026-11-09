@@ -4,6 +4,8 @@ import type {
   DataStore,
   Goal,
   Goals,
+  HabitCheck,
+  HabitInput,
   ItemInput,
   Movement,
   MovementInput,
@@ -20,6 +22,8 @@ const GOAL_COLUMNS =
 const MOVEMENT_COLUMNS =
   "id, name, kind, default_amount, goal_value, goal_anchor_week, goal_step, goal_step_mode, created_at";
 const MOVEMENT_LOG_COLUMNS = "id, movement_id, amount, logged_at";
+const HABIT_COLUMNS = "id, name, goal_days, includes, created_at";
+const HABIT_CHECK_COLUMNS = "habit_id, day, auto";
 
 // Every list below is read through `selectAll`: a plain select returns at most
 // 1000 rows and quietly drops the rest. Each is ordered by something unique,
@@ -275,6 +279,63 @@ export const remoteStore: DataStore = {
   async deleteMovementLog(logId: string) {
     const supabase = createClient();
     const { error } = await supabase.from("movement_logs").delete().eq("id", logId);
+    if (error) throw error;
+  },
+  async listHabits() {
+    const supabase = createClient();
+    return selectAll((from, to) =>
+      supabase.from("habits").select(HABIT_COLUMNS).order("name").order("id").range(from, to)
+    );
+  },
+  async createHabit(input: HabitInput) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("habits")
+      .insert(input)
+      .select(HABIT_COLUMNS)
+      .single();
+    if (error || !data) throw error ?? new Error("Could not create habit.");
+    return data;
+  },
+  async updateHabit(habitId: string, input: HabitInput) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("habits")
+      .update(input)
+      .eq("id", habitId)
+      .select(HABIT_COLUMNS)
+      .single();
+    if (error || !data) throw error ?? new Error("Could not update habit.");
+    return data;
+  },
+  async listHabitChecks() {
+    const supabase = createClient();
+    return selectAll((from, to) =>
+      supabase
+        .from("habit_checks")
+        .select(HABIT_CHECK_COLUMNS)
+        .order("day")
+        .order("habit_id")
+        .range(from, to)
+    );
+  },
+  async addHabitChecks(checks: HabitCheck[]) {
+    if (checks.length === 0) return;
+    const supabase = createClient();
+    // A check that already exists (e.g. made on another device) is left as it is.
+    const { error } = await supabase
+      .from("habit_checks")
+      .upsert(checks, { onConflict: "habit_id,day", ignoreDuplicates: true });
+    if (error) throw error;
+  },
+  async removeHabitChecks(day: string, habitIds: string[]) {
+    if (habitIds.length === 0) return;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("habit_checks")
+      .delete()
+      .eq("day", day)
+      .in("habit_id", habitIds);
     if (error) throw error;
   },
 };

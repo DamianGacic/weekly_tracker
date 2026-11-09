@@ -37,7 +37,7 @@ export function WeekProgressBar({ fraction }: { fraction: number }) {
   );
 }
 
-const STATUS_COLORS: Record<GoalStatus, string> = {
+export const STATUS_COLORS: Record<GoalStatus, string> = {
   green: "bg-green-500",
   yellow: "bg-yellow-400",
   red: "bg-red-500",

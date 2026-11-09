@@ -33,10 +33,11 @@ away, no Supabase project required. Data lives in `localStorage` until you sign 
    [`supabase/migrations/0003_log_amounts.sql`](supabase/migrations/0003_log_amounts.sql),
    [`supabase/migrations/0004_week_notes.sql`](supabase/migrations/0004_week_notes.sql),
    [`supabase/migrations/0005_movements.sql`](supabase/migrations/0005_movements.sql),
-   [`supabase/migrations/0006_item_staples.sql`](supabase/migrations/0006_item_staples.sql) and
-   [`supabase/migrations/0007_raw_macros.sql`](supabase/migrations/0007_raw_macros.sql).
-   These create the `items`/`logs`/`raw_macros`/`goals`/`week_notes`/`movements`/`movement_logs`
-   tables and their Row Level Security policies.
+   [`supabase/migrations/0006_item_staples.sql`](supabase/migrations/0006_item_staples.sql),
+   [`supabase/migrations/0007_raw_macros.sql`](supabase/migrations/0007_raw_macros.sql) and
+   [`supabase/migrations/0009_habits.sql`](supabase/migrations/0009_habits.sql).
+   These create the `items`/`logs`/`raw_macros`/`goals`/`week_notes`/`movements`/`movement_logs`/
+   `habits`/`habit_checks` tables and their Row Level Security policies.
 3. Under **Authentication → Sign In / Providers**, confirm Email is enabled (it is by default; no
    password is required — this app uses magic links).
 4. Under **Authentication → URL Configuration**, set:
@@ -77,4 +78,11 @@ actually restricts each signed-in user to their own rows.
   `DataStore` interface (`lib/store/types.ts`), so the UI components don't know or care which one
   is active — `lib/store/AuthProvider.tsx` picks based on sign-in state.
 - Editing/deleting items, undoing a log entry, and per-day breakdowns are intentionally not
-  built — the app only ever shows week-level numbers.
+  built — the app only ever shows week-level numbers. Habits are the one exception: they're
+  checked off per day (`habit_checks`, one row per habit per day done, keyed by the local
+  calendar date) against an optional goal of days per week.
+- A habit can include other habits (`habits.includes`). Checking it on a day also checks every
+  habit it includes, directly or through others, that isn't checked yet; those checks are stored
+  with `auto = true`. Unchecking it removes its check and every `auto` check left without a
+  checked habit that directly includes it, so a check you made yourself is never removed by
+  unchecking another habit (`toggleHabit` in `lib/habits.ts`).

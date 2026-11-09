@@ -81,6 +81,21 @@ export function localDateKey(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** The seven days of the week starting `weekStart`, Monday first, each at local midnight. */
+export function weekDays(weekStart: Date): Date[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(weekStart);
+    day.setDate(day.getDate() + i);
+    return day;
+  });
+}
+
+/** Local midnight of a "YYYY-MM-DD" key made by `localDateKey`. */
+export function parseDateKey(key: string): Date {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export function formatWeekLabel(weekStart: Date): string {
   const { year, week } = getISOWeek(weekStart);
   return `${year}, week ${week}`;

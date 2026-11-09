@@ -3,6 +3,7 @@ import {
   localStore,
   clearLocalData,
   clearLocalGoals,
+  clearLocalHabits,
   clearLocalMovements,
   clearLocalNotes,
   clearLocalRawMacros,
@@ -71,6 +72,42 @@ async function migrateLocalMovementsToRemote(): Promise<void> {
 }
 
 /**
+ * Same one-time upload as movements above, for habits and their checks. A
+ * habit's `includes` point at other habits by id, so every habit is created
+ * first and the links are filled in once all the new ids are known.
+ */
+async function migrateLocalHabitsToRemote(): Promise<void> {
+  const localHabits = await localStore.listHabits();
+  if (localHabits.length === 0) return;
+
+  try {
+    if ((await remoteStore.listHabits()).length > 0) return;
+    const localChecks = await localStore.listHabitChecks();
+
+    const idMap = new Map<string, string>();
+    for (const { id, name, goal_days } of localHabits) {
+      const created = await remoteStore.createHabit({ name, goal_days, includes: [] });
+      idMap.set(id, created.id);
+    }
+    for (const { id, name, goal_days, includes } of localHabits) {
+      const remoteIncludes = includes.flatMap((included) => idMap.get(included) ?? []);
+      if (remoteIncludes.length === 0) continue;
+      await remoteStore.updateHabit(idMap.get(id)!, { name, goal_days, includes: remoteIncludes });
+    }
+
+    await remoteStore.addHabitChecks(
+      localChecks.flatMap((check) => {
+        const habitId = idMap.get(check.habit_id);
+        return habitId ? [{ ...check, habit_id: habitId }] : [];
+      })
+    );
+    clearLocalHabits();
+  } catch (err) {
+    console.error("Failed to migrate habits to Supabase:", err);
+  }
+}
+
+/**
  * Week notes written while signed out are uploaded for weeks the account has
  * no note for yet; a week that already has one keeps it.
  */
@@ -120,6 +157,7 @@ export async function migrateLocalDataToRemote(): Promise<void> {
   await migrateLocalNotesToRemote();
   await migrateLocalMovementsToRemote();
   await migrateLocalRawMacrosToRemote();
+  await migrateLocalHabitsToRemote();
 
   const supabase = createClient();
 

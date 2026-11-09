@@ -86,6 +86,27 @@ export type MovementLog = {
 /** Each week's note, keyed by that week's Monday as "YYYY-MM-DD" (see `localDateKey`). */
 export type WeekNotes = Record<string, string>;
 
+export type Habit = {
+  id: string;
+  name: string;
+  /** How many days a week to do it, 1–7; null when it has no goal. */
+  goal_days: number | null;
+  /** Ids of the habits that checking this one also checks on the same day. */
+  includes: string[];
+  created_at: string;
+};
+
+export type HabitInput = Omit<Habit, "id" | "created_at">;
+
+/** A habit done on a day. Days without a check weren't done. */
+export type HabitCheck = {
+  habit_id: string;
+  /** Local calendar date as "YYYY-MM-DD" (see `localDateKey`). */
+  day: string;
+  /** Checked because a habit that includes it was checked, not by checking it itself. */
+  auto: boolean;
+};
+
 export interface DataStore {
   listItems(): Promise<Item[]>;
   listLogs(): Promise<LogEntry[]>;
@@ -114,4 +135,12 @@ export interface DataStore {
   /** `loggedAt` defaults to now; pass it explicitly to log into a past week. */
   logMovement(movementId: string, amount: number, loggedAt?: string): Promise<MovementLog>;
   deleteMovementLog(logId: string): Promise<void>;
+  listHabits(): Promise<Habit[]>;
+  createHabit(input: HabitInput): Promise<Habit>;
+  updateHabit(habitId: string, input: HabitInput): Promise<Habit>;
+  listHabitChecks(): Promise<HabitCheck[]>;
+  /** Saves all the checks at once; a habit already checked on that day keeps its check. */
+  addHabitChecks(checks: HabitCheck[]): Promise<void>;
+  /** Removes the checks of all `habitIds` on `day` at once. */
+  removeHabitChecks(day: string, habitIds: string[]): Promise<void>;
 }

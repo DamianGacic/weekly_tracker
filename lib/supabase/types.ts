@@ -230,6 +230,62 @@ export type Database = {
         };
         Relationships: [];
       };
+      habits: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          goal_days: number | null;
+          includes: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          goal_days?: number | null;
+          includes?: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          goal_days?: number | null;
+          includes?: string[];
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      habit_checks: {
+        Row: {
+          user_id: string;
+          habit_id: string;
+          day: string;
+          auto: boolean;
+        };
+        Insert: {
+          user_id?: string;
+          habit_id: string;
+          day: string;
+          auto?: boolean;
+        };
+        Update: {
+          user_id?: string;
+          habit_id?: string;
+          day?: string;
+          auto?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "habit_checks_habit_id_fkey";
+            columns: ["habit_id"];
+            isOneToOne: false;
+            referencedRelation: "habits";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

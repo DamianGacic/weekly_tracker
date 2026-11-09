@@ -19,6 +19,11 @@ const NAV_LINKS: Record<Section, { key: Tab; href: string; label: string }[]> = 
     { key: "list", href: "/movement/moves", label: "Your moves" },
     { key: "history", href: "/movement/history", label: "History" },
   ],
+  habits: [
+    { key: "week", href: "/habits", label: "This week" },
+    { key: "list", href: "/habits/list", label: "Your habits" },
+    { key: "history", href: "/habits/history", label: "History" },
+  ],
 };
 
 export function AppHeader({ section, tab }: { section: Section; tab: Tab }) {

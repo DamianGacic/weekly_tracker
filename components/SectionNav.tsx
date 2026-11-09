@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { Activity, Utensils } from "lucide-react";
+import { Activity, ListChecks, Utensils } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type Section = "macros" | "movement";
+export type Section = "macros" | "movement" | "habits";
 
 const SECTIONS = [
   { key: "macros", href: "/", label: "Macros", Icon: Utensils },
   { key: "movement", href: "/movement", label: "Movement", Icon: Activity },
+  { key: "habits", href: "/habits", label: "Habits", Icon: ListChecks },
 ] as const;
 
 /** Rail on the left for switching between the app's sections. Icons only on phones, to save width. */

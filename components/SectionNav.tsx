@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { Activity, ListChecks, Utensils } from "lucide-react";
+import { Activity, Dumbbell, ListChecks, Utensils } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type Section = "macros" | "movement" | "habits";
+export type Section = "macros" | "movement" | "lifts" | "habits";
 
 const SECTIONS = [
   { key: "macros", href: "/", label: "Macros", Icon: Utensils },
   { key: "movement", href: "/movement", label: "Movement", Icon: Activity },
+  { key: "lifts", href: "/lifts", label: "Lifts", Icon: Dumbbell },
   { key: "habits", href: "/habits", label: "Habits", Icon: ListChecks },
 ] as const;
 

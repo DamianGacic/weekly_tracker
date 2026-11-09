@@ -19,6 +19,11 @@ const NAV_LINKS: Record<Section, { key: Tab; href: string; label: string }[]> = 
     { key: "list", href: "/movement/moves", label: "Your moves" },
     { key: "history", href: "/movement/history", label: "History" },
   ],
+  lifts: [
+    { key: "week", href: "/lifts", label: "This week" },
+    { key: "list", href: "/lifts/list", label: "Your lifts" },
+    { key: "history", href: "/lifts/history", label: "History" },
+  ],
   habits: [
     { key: "week", href: "/habits", label: "This week" },
     { key: "list", href: "/habits/list", label: "Your habits" },

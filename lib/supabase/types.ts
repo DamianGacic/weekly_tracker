@@ -1,3 +1,11 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export type Database = {
   public: {
     Tables: {
@@ -205,6 +213,66 @@ export type Database = {
             columns: ["movement_id"];
             isOneToOne: false;
             referencedRelation: "movements";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lifts: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          /** An array of `{ sets, weight, reps }`; read through `goalFromJson`. */
+          goal: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          goal?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          goal?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      lift_sets: {
+        Row: {
+          id: string;
+          user_id: string;
+          lift_id: string;
+          weight: number;
+          reps: number;
+          logged_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          lift_id: string;
+          weight: number;
+          reps: number;
+          logged_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          lift_id?: string;
+          weight?: number;
+          reps?: number;
+          logged_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lift_sets_lift_id_fkey";
+            columns: ["lift_id"];
+            isOneToOne: false;
+            referencedRelation: "lifts";
             referencedColumns: ["id"];
           },
         ];

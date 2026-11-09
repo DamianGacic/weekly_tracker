@@ -28,7 +28,7 @@ function saveFile(blob: Blob, fileName: string) {
 
 /** Downloads everything in `store` as JSON: the complete backup, every log with its timestamp. */
 export async function downloadJsonExport(store: DataStore, account: string | null) {
-  const [items, logs, rawMacros, goals, notes, movements, movementLogs, habits, habitChecks] =
+  const [items, logs, rawMacros, goals, notes, movements, movementLogs, lifts, liftSets, habits, habitChecks] =
     await Promise.all([
       store.listItems(),
       store.listLogs(),
@@ -37,6 +37,8 @@ export async function downloadJsonExport(store: DataStore, account: string | nul
       store.listWeekNotes(),
       store.listMovements(),
       store.listMovementLogs(),
+      store.listLifts(),
+      store.listLiftSets(),
       store.listHabits(),
       store.listHabitChecks(),
     ]);
@@ -52,6 +54,8 @@ export async function downloadJsonExport(store: DataStore, account: string | nul
       notes,
       movements,
       movementLogs,
+      lifts,
+      liftSets,
       habits,
       habitChecks,
     },

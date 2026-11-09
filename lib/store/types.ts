@@ -83,6 +83,34 @@ export type MovementLog = {
   logged_at: string;
 };
 
+/** One line of a lift's weekly goal: `sets` sets of at least `weight` kg for at least `reps` reps. */
+export type LiftGoalLine = {
+  sets: number;
+  /** In kg; 0 for bodyweight. */
+  weight: number;
+  reps: number;
+};
+
+export type Lift = {
+  id: string;
+  name: string;
+  /** The weekly goal, hardest line first (see `normalizeGoal`); empty for no goal. */
+  goal: LiftGoalLine[];
+  created_at: string;
+};
+
+export type LiftInput = Omit<Lift, "id" | "created_at">;
+
+/** One set of a lift. */
+export type LiftSet = {
+  id: string;
+  lift_id: string;
+  /** In kg; 0 for bodyweight. */
+  weight: number;
+  reps: number;
+  logged_at: string;
+};
+
 /** Each week's note, keyed by that week's Monday as "YYYY-MM-DD" (see `localDateKey`). */
 export type WeekNotes = Record<string, string>;
 
@@ -135,6 +163,21 @@ export interface DataStore {
   /** `loggedAt` defaults to now; pass it explicitly to log into a past week. */
   logMovement(movementId: string, amount: number, loggedAt?: string): Promise<MovementLog>;
   deleteMovementLog(logId: string): Promise<void>;
+  listLifts(): Promise<Lift[]>;
+  createLift(input: LiftInput): Promise<Lift>;
+  updateLift(liftId: string, input: LiftInput): Promise<Lift>;
+  listLiftSets(): Promise<LiftSet[]>;
+  /**
+   * Logs `count` identical sets of `weight` kg × `reps`, all at `loggedAt`
+   * (default now; pass it explicitly to log into a past week).
+   */
+  logLiftSets(
+    liftId: string,
+    set: { weight: number; reps: number },
+    count: number,
+    loggedAt?: string
+  ): Promise<LiftSet[]>;
+  deleteLiftSet(setId: string): Promise<void>;
   listHabits(): Promise<Habit[]>;
   createHabit(input: HabitInput): Promise<Habit>;
   updateHabit(habitId: string, input: HabitInput): Promise<Habit>;

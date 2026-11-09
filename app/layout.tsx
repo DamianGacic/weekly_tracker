@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "weekly",
-  description: "A minimal weekly macro, movement and habit tracker.",
+  description: "A minimal weekly macro, movement, lift and habit tracker.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -3,6 +3,7 @@ import {
   localStore,
   clearLocalData,
   clearLocalGoals,
+  clearLocalLifts,
   clearLocalHabits,
   clearLocalMovements,
   clearLocalNotes,
@@ -68,6 +69,39 @@ async function migrateLocalMovementsToRemote(): Promise<void> {
     clearLocalMovements();
   } catch (err) {
     console.error("Failed to migrate movements to Supabase:", err);
+  }
+}
+
+/**
+ * Same one-time upload as movements above, for lifts and their sets: only
+ * into an account with no lifts yet, and local data is cleared only if every
+ * lift and set made it.
+ */
+async function migrateLocalLiftsToRemote(): Promise<void> {
+  const localLifts = await localStore.listLifts();
+  if (localLifts.length === 0) return;
+
+  try {
+    if ((await remoteStore.listLifts()).length > 0) return;
+    const localSets = await localStore.listLiftSets();
+
+    const idMap = new Map<string, string>();
+    for (const { id, name, goal } of localLifts) {
+      const created = await remoteStore.createLift({ name, goal });
+      idMap.set(id, created.id);
+    }
+
+    const setsToInsert = localSets.flatMap(({ lift_id, weight, reps, logged_at }) => {
+      const liftId = idMap.get(lift_id);
+      return liftId ? [{ lift_id: liftId, weight, reps, logged_at }] : [];
+    });
+    if (setsToInsert.length > 0) {
+      const { error } = await createClient().from("lift_sets").insert(setsToInsert);
+      if (error) throw error;
+    }
+    clearLocalLifts();
+  } catch (err) {
+    console.error("Failed to migrate lifts to Supabase:", err);
   }
 }
 
@@ -157,6 +191,7 @@ export async function migrateLocalDataToRemote(): Promise<void> {
   await migrateLocalNotesToRemote();
   await migrateLocalMovementsToRemote();
   await migrateLocalRawMacrosToRemote();
+  await migrateLocalLiftsToRemote();
   await migrateLocalHabitsToRemote();
 
   const supabase = createClient();

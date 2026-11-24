@@ -65,6 +65,32 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+/** Fired on `window` after any store write succeeds, so views with their own copy of the data can reload. */
+export const STORE_CHANGE_EVENT = "weekly:store-change";
+
+/** `store` with every write (anything but list…/get…) firing STORE_CHANGE_EVENT once it succeeds. */
+function withChangeEvents(store: DataStore): DataStore {
+  return new Proxy(store, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== "function" || typeof prop !== "string" || /^(list|get)/.test(prop)) {
+        return value;
+      }
+      return (...args: unknown[]) => {
+        const result = value.apply(target, args);
+        Promise.resolve(result).then(
+          () => window.dispatchEvent(new Event(STORE_CHANGE_EVENT)),
+          () => {}
+        );
+        return result;
+      };
+    },
+  });
+}
+
+const remoteWithEvents = withChangeEvents(remoteStore);
+const localWithEvents = withChangeEvents(localStore);
+
 export function storeFor(status: AuthStatus): DataStore {
-  return status === "authed" ? remoteStore : localStore;
+  return status === "authed" ? remoteWithEvents : localWithEvents;
 }

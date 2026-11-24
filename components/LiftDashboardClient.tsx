@@ -6,7 +6,8 @@ import { useLiftData } from "@/lib/store/useLiftData";
 import { formatWeekLabel, getWeekStart, weekProgress } from "@/lib/week";
 import { goalProgress, goalSetCount, setsByLift } from "@/lib/lifts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { WeekProgressBar } from "@/components/WeekBars";
+import { GoalBar, WeekProgressBar } from "@/components/WeekBars";
+import { movementStatus } from "@/lib/goals";
 import { MovementStat } from "@/components/MovementDashboardClient";
 import { LiftDialog } from "@/components/LiftDialog";
 import { LiftWeekEditor } from "@/components/LiftWeekEditor";
@@ -49,6 +50,18 @@ export function LiftDashboardClient() {
           <CardTitle>This week</CardTitle>
           <p className="text-xs text-muted-foreground">{formatWeekLabel(weekStart)}</p>
           <WeekProgressBar fraction={progress} />
+          {goalTotal > 0 && (
+            <GoalBar
+              label="All goals"
+              hint={`${goalsComplete} of ${withGoals.length} complete`}
+              emptyLabel="No goals set"
+              consumed={goalDone}
+              target={goalTotal}
+              unit=" sets"
+              progress={progress}
+              status={movementStatus(goalDone, goalTotal, progress)}
+            />
+          )}
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
           <MovementStat

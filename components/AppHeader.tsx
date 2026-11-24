@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/store/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { AccountMenu } from "@/components/AccountMenu";
+import { OverallBarToggle } from "@/components/OverallGoalsBar";
 import type { Section } from "@/components/SectionNav";
 
 export type Tab = "week" | "list" | "history" | "progression";
@@ -56,16 +57,19 @@ export function AppHeader({ section, tab }: { section: Section; tab: Tab }) {
           ))}
         </nav>
       </div>
-      {status === "authed" && email ? (
-        <AccountMenu email={email} />
-      ) : status === "anon" ? (
-        <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/login" />}>
-          <span className="sm:hidden">Sign in</span>
-          <span className="hidden sm:inline">Sign in to save online</span>
-        </Button>
-      ) : (
-        <div className="h-8 w-24" />
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        <OverallBarToggle />
+        {status === "authed" && email ? (
+          <AccountMenu email={email} />
+        ) : status === "anon" ? (
+          <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/login" />}>
+            <span className="sm:hidden">Sign in</span>
+            <span className="hidden sm:inline">Sign in to save online</span>
+          </Button>
+        ) : (
+          <div className="h-8 w-24" />
+        )}
+      </div>
     </header>
   );
 }

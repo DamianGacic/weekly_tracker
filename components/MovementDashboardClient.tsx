@@ -49,6 +49,19 @@ export function MovementDashboardClient() {
   // Moves with a goal are logged from their goal display; the rest from the list below.
   const withGoals = movements.filter((movement) => movement.goal);
   const withoutGoals = movements.filter((movement) => !movement.goal);
+  // Overall progress: each goal's share done (capped at 100%), averaged so every goal
+  // counts the same whether it's in reps or minutes.
+  const overall =
+    withGoals.length === 0
+      ? null
+      : withGoals.reduce((sum, movement) => {
+          const target = goalForWeek(movement.goal!, weekStart);
+          const done = totals.get(movement.id) ?? 0;
+          return sum + (target > 0 ? Math.min(done / target, 1) : 1);
+        }, 0) / withGoals.length;
+  const goalsComplete = withGoals.filter(
+    (movement) => (totals.get(movement.id) ?? 0) >= goalForWeek(movement.goal!, weekStart)
+  ).length;
   const { pendingId, saveError, logMovement, unlogMovement } = useMovementLogger({
     store,
     weekLogs,
@@ -74,6 +87,19 @@ export function MovementDashboardClient() {
           <CardTitle>This week</CardTitle>
           <p className="text-xs text-muted-foreground">{formatWeekLabel(weekStart)}</p>
           <WeekProgressBar fraction={progress} />
+          {overall !== null && (
+            <GoalBar
+              label="All goals"
+              hint={`${goalsComplete} of ${withGoals.length} complete`}
+              emptyLabel="No goals set"
+              consumed={overall}
+              target={1}
+              unit=""
+              progress={progress}
+              status={movementStatus(overall, 1, progress)}
+              valueLabel={`${Math.round(overall * 100)}%`}
+            />
+          )}
           {KINDS.map((kind) => {
             const goals = withGoals.filter((movement) => movement.kind === kind);
             if (goals.length === 0) return null;

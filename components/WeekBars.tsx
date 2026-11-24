@@ -57,6 +57,7 @@ export function GoalBar({
   unit,
   progress,
   status,
+  valueLabel,
 }: {
   label: string;
   /** Shown in lighter text after the label, e.g. what tapping the bar logs. */
@@ -67,6 +68,8 @@ export function GoalBar({
   unit: string;
   progress: number;
   status: GoalStatus | null;
+  /** Replaces the default "consumed / target" text on the right. */
+  valueLabel?: string;
 }) {
   const fraction = target === null ? 0 : target > 0 ? Math.min(consumed / target, 1) : consumed > 0 ? 1 : 0;
   const percent = Math.round(fraction * 100);
@@ -80,6 +83,8 @@ export function GoalBar({
         </span>
         {target === null ? (
           <span className="text-muted-foreground">{emptyLabel}</span>
+        ) : valueLabel !== undefined ? (
+          <span>{valueLabel}</span>
         ) : (
           <span>
             {round1(consumed)} / {round1(target)}
